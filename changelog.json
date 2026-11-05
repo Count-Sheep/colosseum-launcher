@@ -5,7 +5,9 @@
     ],
     "game": [
       "Battle animations can run at 4× or 8× speed or be skipped, with menus at normal speed and text up long enough to read.",
-      "Building the game on Linux and macOS is faster: its code now compiles once instead of twice.",
+      "Building the game is faster: its code now compiles once instead of twice, on Windows too.",
+      "Game updates that change only part of the build now reuse more of what was already compiled.",
+      "The first game build after this update takes longer, as it starts over with what it keeps between builds.",
       "Fixed new builds on Linux and macOS leaving out small corrections to battle and menu code that only a rebuild picked up."
     ]
   },
