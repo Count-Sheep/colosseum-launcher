@@ -40,11 +40,21 @@ function gitRevision(root) {
   } catch (_) { return null; }
 }
 
+// The launcher's own changes to the port, kept in this repository and applied to the checkout: the port's
+// repository is only read. Its hash is part of what a build is made from, so a changed patch builds again.
+function portPatchFile(source = release) { return source.portPatch ? port.launcherScript(source.portPatch) : null; }
+
+function patchHash(source = release) {
+  const file = portPatchFile(source);
+  return file ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+}
+
 // What a game version is made from: the port, the decomp it compiles and the renderer's sources (with the
 // Super Mario Sunshine decomp whose headers those use), each at one commit (game-release.json), and the tools.
 function identity(platform = process.platform, arch = process.arch, source = release) {
   const asset = tools.assetFor(platform, arch);
   return { schema: 1, gameVersion: source.version, commit: source.commit, decomp: source.decomp, renderer: source.renderer.commit,
+    portPatch: patchHash(source),
     platform, hostArch: arch, toolVersion: tools.toolsetFor(platform, arch), toolSha256: asset.sha256 };
 }
 
@@ -89,7 +99,7 @@ function isCurrent(root, source = release, base = portable.root()) {
 // tells versions apart (the computer's system, the tools).
 function snapshotPath(base, source = release) {
   const expected = identity(undefined, undefined, source);
-  const hash = crypto.createHash('sha256').update([source.decomp, source.renderer.commit, tools.platformId(), expected.toolSha256].join('|')).digest('hex').slice(0, 4);
+  const hash = crypto.createHash('sha256').update([source.decomp, source.renderer.commit, expected.portPatch, tools.platformId(), expected.toolSha256].join('|')).digest('hex').slice(0, 4);
   return path.join(`${base}.releases`, `${source.commit.slice(0, 7)}-${hash}`);
 }
 
@@ -140,6 +150,8 @@ async function checkout(root, { git = 'git', run, capture, env, source = release
   const temporary = `${root}.download-${crypto.randomUUID()}`;
   try {
     await shallowCheckout(temporary, source.repository, source.commit, 'port source', tools);
+    if (source.portPatch)
+      await run(git, ['apply', '--whitespace=nowarn', portPatchFile(source)], { cwd: temporary, env }, 'Prepare port source');
     const { decomp, renderer } = port.dependencyPaths(temporary);
     await shallowCheckout(decomp, source.decompRepository, source.decomp, 'decomp source', tools);
     await shallowCheckout(renderer, source.renderer.repository, source.renderer.commit, 'renderer source', tools);

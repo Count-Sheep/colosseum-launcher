@@ -2,7 +2,8 @@
 
 // Maintainer command: select a complete port revision, then bump the launcher so its release gate verifies
 // exactly the source players will receive. The port names the decomp and renderer commits it builds with in
-// tools/ci/linux-build.sh, so they follow it here.
+// tools/ci/linux-build.sh, so they follow it here. scripts/port-launcher.patch must still apply to the new commit:
+// the launcher's checkout fails if it does not, and Game build shows that before any release.
 //   npm run update:game            the newest commit of the port's branch (game-release.json's)
 //   npm run update:game -- <ref>   that commit, tag or branch
 const fs = require('node:fs');

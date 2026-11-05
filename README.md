@@ -99,7 +99,7 @@ Open the activity log with **Activity log** in the status bar, choose **Copy log
 
 ### What it builds
 
-The game is [pokemon-colosseum](https://git.softwareauralabs.com/chase/pokemon-colosseum) (the port, on GitLab), compiled from the [pkmn-colosseum](https://github.com/dougchansan/pkmn-colosseum) decompilation, with the renderer's sources from [sms-pc-port](https://github.com/chasem-dev/sms-pc-port). `src/game-release.json` pins all of them to exact commits; the game folder holds the port with `deps/pkmn-colosseum` and `deps/sms-pc-port` inside it. `scripts/build-colosseum.sh` runs the port's own `build.sh` there. No game data is in any of those repositories, and the build needs none: the player's disc is read when the game runs.
+The game is [pokemon-colosseum](https://git.softwareauralabs.com/chase/pokemon-colosseum) (the port, on GitLab), compiled from the [pkmn-colosseum](https://github.com/dougchansan/pkmn-colosseum) decompilation, with the renderer's sources from [sms-pc-port](https://github.com/chasem-dev/sms-pc-port). `src/game-release.json` pins all of them to exact commits; the game folder holds the port with `deps/pkmn-colosseum` and `deps/sms-pc-port` inside it. The launcher only reads those repositories: its own changes to the port, for its private toolchain and for paths with spaces, are `scripts/port-launcher.patch`, applied to the checkout. `scripts/build-colosseum.sh` runs the port's own `build.sh` there. No game data is in any of those repositories, and the build needs none: the player's disc is read when the game runs.
 
 The launcher is built on [SMS Launcher](https://github.com/chasem-dev/sms-launcher)'s setup: the same three steps, private toolsets and release pipeline, without that game's extras.
 

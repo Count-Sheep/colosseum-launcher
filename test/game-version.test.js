@@ -216,6 +216,27 @@ test('the game folder is the port with the decomp and renderer inside it, each a
   assert.deepEqual(fs.readdirSync(home).filter(name => name.includes('.download-')), []);
 });
 
+test('the launcher\'s patch is applied to the port it pins, and a changed patch means another build', { skip: process.platform === 'win32' }, async t => {
+  const home = folder(t, 'colo checkout-');
+  const pinned = sourceFrom(home);
+  const patch = path.join(home, 'test.patch');
+  fs.writeFileSync(patch, ['--- a/build.sh', '+++ b/build.sh', '@@ -0,0 +1 @@', '+patched', ''].join('\n'));
+  port.useLauncherScripts(home);
+  t.after(() => port.useLauncherScripts(null));
+  const root = path.join(home, 'game');
+  await game.checkout(root, { ...runner(process.env), source: { ...pinned, portPatch: 'test.patch' } });
+  assert.equal(fs.readFileSync(path.join(root, 'build.sh'), 'utf8'), 'patched\n');
+  assert.equal(game.matchesSource(root, pinned), true, 'the commit stays the pinned one');
+  const before = game.identity(undefined, undefined, { ...pinned, portPatch: 'test.patch' }).portPatch;
+  fs.appendFileSync(patch, '+more\n');
+  assert.notEqual(game.identity(undefined, undefined, { ...pinned, portPatch: 'test.patch' }).portPatch, before);
+});
+
+test('this release\'s patch applies to the port commit it pins', () => {
+  assert.equal(source.branch, 'master');
+  assert.ok(fs.statSync(path.resolve(__dirname, '..', 'scripts', source.portPatch)).size > 0);
+});
+
 test('a download that fails leaves no game folder behind', { skip: process.platform === 'win32' }, async t => {
   const home = folder(t, 'colo checkout-');
   const pinned = sourceFrom(home);

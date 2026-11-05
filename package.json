@@ -31,7 +31,8 @@
         "to": "scripts",
         "filter": [
           "build-colosseum.sh",
-          "install-textures.py"
+          "install-textures.py",
+          "port-launcher.patch"
         ]
       }
     ],
