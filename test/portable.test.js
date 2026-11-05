@@ -1,0 +1,136 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const port = require('../src/port');
+const portable = require('../src/portable');
+const saves = require('../src/saves');
+
+const exeDir = path.resolve('/usb/games');
+const env = { PORTABLE_EXECUTABLE_DIR: exeDir, APPDATA: path.resolve('/appdata') };
+const root = path.join(exeDir, 'Colosseum-Launcher-Portable');
+
+test('only the Windows portable build gets a portable folder beside the exe', () => {
+  assert.equal(portable.root(env, 'win32'), root);
+  assert.equal(portable.root({}, 'win32'), null);
+  assert.equal(portable.root(env, 'linux'), null);
+});
+
+test('portable saves and backups stay in the portable folder', () => {
+  const repo = path.join(root, 'sms-pc-port');
+  assert.equal(saves.saveDirectory(repo, env, 'win32'), path.join(root, 'saves', 'card-a'));
+  assert.equal(saves.saveDirectory(repo, { ...env, SMS_SAVE_DIR: 'custom' }, 'win32'), path.join(repo, 'custom'));
+  assert.equal(saves.backupRoot(env, 'win32'), path.join(root, 'Save Backups'));
+  assert.notEqual(saves.backupRoot({}, 'win32'), path.join(root, 'Save Backups'));
+});
+
+test('paths inside the portable folder are saved relative and follow it when moved', () => {
+  const outside = path.resolve('/discs/sms.iso');
+  const config = { repo: path.join(root, 'sms-pc-port'), rom: outside, installRoot: null, saveDirectory: root,
+    settings: { arch: '64' }, previousInstall: { repo: path.join(root, 'old'), rom: path.join(root, 'sms.iso') } };
+  const stored = portable.storedPaths(config, root);
+  assert.equal(stored.repo, 'sms-pc-port');
+  assert.equal(stored.rom, outside);
+  assert.equal(stored.installRoot, null);
+  assert.equal(stored.saveDirectory, '.');
+  assert.deepEqual(stored.settings, { arch: '64' });
+  assert.deepEqual(stored.previousInstall, { repo: 'old', rom: 'sms.iso' });
+  assert.equal(config.repo, path.join(root, 'sms-pc-port'));
+
+  const moved = path.resolve('/other/Colosseum-Launcher-Portable');
+  const loaded = portable.resolvedPaths(JSON.parse(JSON.stringify(stored)), moved);
+  assert.equal(loaded.repo, path.join(moved, 'sms-pc-port'));
+  assert.equal(loaded.rom, outside);
+  assert.equal(loaded.saveDirectory, moved);
+  assert.equal(loaded.previousInstall.rom, path.join(moved, 'sms.iso'));
+});
+
+test('portable games keep their shader cache in the portable folder', () => {
+  assert.equal(portable.shaderCache(root, '64'), path.join(root, 'cache', 'gx-programs-64.bin'));
+  assert.equal(portable.shaderCache(root, '32'), path.join(root, 'cache', 'gx-programs-32.bin'));
+  assert.equal(portable.textureCache(root), path.join(root, 'cache', 'texture-mips'));
+});
+
+test('a sibling folder with a similar name is not treated as inside', () => {
+  const sibling = `${root}-old${path.sep}sms-pc-port`;
+  assert.equal(portable.storedPaths({ repo: sibling }, root).repo, sibling);
+  assert.equal(portable.storedPaths({ rom: '' }, root).rom, '');
+  assert.deepEqual(portable.storedPaths({ repo: 'x' }, null), { repo: 'x' });
+});
+
+test('paths recorded inside the portable folder follow it to another drive or computer', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sms portable move-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const moved = path.join(home, 'Colosseum-Launcher-Portable');
+  fs.mkdirSync(path.join(moved, 'build-tools', 'windows-x64'), { recursive: true });
+  const target = path.join(moved, 'build-tools', 'windows-x64');
+  assert.equal(portable.relocated('C:/Users/me/Desktop/Colosseum-Launcher-Portable/build-tools/windows-x64', moved), target);
+  assert.equal(portable.relocated('D:\\colosseum-launcher-portable\\build-tools\\windows-x64', moved), target);
+  // Left alone: paths that still exist, are outside any portable folder, or aren't in the moved one either.
+  assert.equal(portable.relocated(target, moved), target);
+  assert.equal(portable.relocated('C:/msys64', moved), 'C:/msys64');
+  assert.equal(portable.relocated('C:/Old/Colosseum-Launcher-Portable/gone', moved), 'C:/Old/Colosseum-Launcher-Portable/gone');
+  assert.equal(portable.relocated('C:/Old/Colosseum-Launcher-Portable/build-tools/windows-x64', null),
+    'C:/Old/Colosseum-Launcher-Portable/build-tools/windows-x64');
+});
+
+test("the launcher's scripts outlive the temporary folder a second start of the .exe deletes", t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sms portable scripts-'));
+  t.after(() => { port.useLauncherScripts(null); fs.rmSync(home, { recursive: true, force: true }); });
+  const resources = path.join(home, 'Temp', '3LF9DEMpouSi8ltUsux9N94UxIw', 'resources', 'scripts');
+  const base = path.join(home, 'Colosseum-Launcher-Portable');
+  fs.mkdirSync(resources, { recursive: true });
+  for (const name of ['texture-progress.py', 'install-language.py', 'resume_downloads.py', 'build-eclipse.sh'])
+    fs.writeFileSync(path.join(resources, name), `# ${name}\n`);
+  const copy = portable.copyScripts(resources, base);
+  assert.equal(copy, path.join(base, 'launcher-scripts'));
+  fs.rmSync(path.join(home, 'Temp'), { recursive: true });   // the second start's stub, on its way out
+  port.useLauncherScripts(copy);
+  const repo = path.join(base, 'sms-pc-port');
+  const progress = port.commandFor(repo, 'textures', [], 'linux').args[0];
+  assert.equal(progress, path.join(copy, 'texture-progress.py'));
+  assert.equal(fs.readFileSync(progress, 'utf8'), '# texture-progress.py\n');
+  assert.equal(port.commandFor(repo, 'language', ['pl'], 'linux').args[1], path.join(copy, 'install-language.py'));
+  assert.equal(port.eclipseBuildCommand(repo, { arch: '64' }, 'linux').command, path.join(copy, 'build-eclipse.sh'));
+  // The next start finds its resources gone too early: the copy from before still serves.
+  assert.equal(portable.copyScripts(resources, base), copy);
+  // Without a copy, the scripts come from the launcher's own folder as before.
+  port.useLauncherScripts(null);
+  assert.equal(port.commandFor(repo, 'textures', [], 'linux').args[0],
+    path.resolve(__dirname, '..', 'scripts', 'texture-progress.py'));
+});
+
+test('a disc left on the old computer is found in the portable folder or beside the exe', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sms portable disc-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const base = path.join(home, 'Colosseum-Launcher-Portable');
+  fs.mkdirSync(base);
+  const validate = file => {
+    if (fs.readFileSync(file, 'utf8') !== 'GMSE01') throw new Error('not the game');
+    return file;
+  };
+  assert.equal(portable.findDisc(base, validate), null);
+  fs.writeFileSync(path.join(home, 'notes.txt'), 'GMSE01');
+  fs.writeFileSync(path.join(home, 'other.iso'), 'another game');
+  assert.equal(portable.findDisc(base, validate), null);
+  fs.writeFileSync(path.join(home, 'Sunshine.ISO'), 'GMSE01');
+  assert.equal(portable.findDisc(base, validate), path.join(home, 'Sunshine.ISO'));
+  fs.writeFileSync(path.join(base, 'sms.ciso'), 'GMSE01');
+  assert.equal(portable.findDisc(base, validate), path.join(base, 'sms.ciso'));
+});
+
+test('a portable launcher says when a newer Stable release is out', () => {
+  const newer = portable.updateNotice('0.1.64', 'v0.1.65');
+  assert.equal(newer.state, 'available');
+  assert.equal(newer.latest, '0.1.65');
+  assert.match(newer.message, /Launcher 0\.1\.65 is out\. Portable launchers don't update themselves/);
+  assert.equal(portable.updateNotice('0.1.64', 'v0.1.64').state, 'unconfigured');
+  assert.equal(portable.updateNotice('0.1.65-beta.12', 'v0.1.64').state, 'unconfigured');
+  assert.equal(portable.updateNotice('0.1.63', 'v0.1.64').state, 'available');
+  assert.equal(portable.updateNotice('0.1.64', null).state, 'unconfigured');
+  assert.equal(portable.updateNotice('0.1.64', 'beta').state, 'unconfigured');
+  assert.match(portable.updateNotice('0.1.64', undefined).message, /download new versions from the releases page/);
+});

@@ -1,0 +1,87 @@
+{
+  "name": "colosseum-launcher",
+  "version": "0.0.0",
+  "private": true,
+  "author": "colosseum-port contributors",
+  "license": "MIT",
+  "desktopName": "colosseum-launcher.desktop",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "description": "Desktop setup, build, update, and play launcher for the Pokémon Colosseum PC port",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "test": "node --test",
+    "dist": "electron-builder",
+    "release": "node scripts/release.js",
+    "update:game": "node scripts/update-game.js"
+  },
+  "build": {
+    "appId": "dev.chasem.colosseumlauncher",
+    "productName": "Colosseum Launcher",
+    "files": [
+      "src/**/*",
+      "changelog.json",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts",
+        "to": "scripts",
+        "filter": [
+          "build-colosseum.sh",
+          "install-textures.py"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "afterPack": "scripts/after-pack.js",
+    "toolsets": {
+      "appimage": "1.0.3"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game",
+      "artifactName": "Colosseum-Launcher.${ext}",
+      "syncDesktopName": true,
+      "executableArgs": [
+        "--no-sandbox"
+      ]
+    },
+    "mac": {
+      "artifactName": "Colosseum-Launcher-${version}-mac-${arch}.${ext}",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.games"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "Colosseum-Launcher-${version}-win-portable.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "tar": "^7.5.22"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.17.0",
+    "yaml": "^2.9.1"
+  }
+}

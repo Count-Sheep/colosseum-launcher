@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'">
+  <title>Colosseum Launcher</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="shell" class="shell">
+    <header class="topbar">
+      <div class="brand"><img class="brand-mark" src="assets/brand-mark.png" alt=""><div class="brand-copy"><span>Colosseum <strong>Launcher</strong></span><span id="version-summary" class="version-summary" aria-label="Versions">Checking versions…</span></div></div>
+      <button id="open-changelog" class="topbar-chip" title="Launcher and game updates"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.8h7.2L15.5 6v11.2H5z"/><path d="M12 2.8V6h3.5M7.6 9.2h5.3M7.6 11.9h5.3M7.6 14.6h3.4"/></svg><span>What's new</span><i id="changelog-new" class="topbar-dot" role="img" aria-label="New" hidden></i></button>
+      <span class="platform-pill" id="platform">Loading…</span>
+      <div class="window-controls" aria-label="Window controls">
+        <button id="window-minimize" class="window-control" aria-label="Minimize window" title="Minimize"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12"/></svg></button>
+        <button id="window-maximize" class="window-control" data-state="normal" aria-label="Maximize window" title="Maximize (F11: full screen)"><svg class="icon-maximize" viewBox="0 0 20 20" aria-hidden="true"><rect x="4.5" y="4.5" width="11" height="11" rx="1"/></svg><svg class="icon-restore" viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="7" width="9" height="9" rx="1"/><path d="M7 7V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-2"/></svg><svg class="icon-leave-full-screen" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4v4H4m8-4v4h4m0 4h-4v4m-4 0v-4H4"/></svg></button>
+        <button id="window-close" class="window-control close-control" aria-label="Close window" title="Close"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+      </div>
+    </header>
+
+    <div id="message" class="message" role="status" hidden><span id="message-text"></span><button id="message-view-log" class="message-log-button" hidden>View activity</button><button id="message-close" class="message-close" aria-label="Dismiss message">×</button></div>
+    <nav class="nav-bar" aria-label="Launcher">
+      <button id="nav-play" class="nav-tab active" aria-current="page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z"/></svg><span>Play</span></button>
+      <button id="nav-saves" class="nav-tab" title="Saved games"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h10l3 3v11H4z"/><path d="M7 3v4h6V3M7 17v-5h7v5"/></svg><span>Saves</span></button>
+      <span class="nav-spacer" aria-hidden="true"></span>
+      <button id="settings-cog" class="nav-tab" aria-label="Settings" title="Settings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.7 2.8h2.6l.4 1.8 1.6.7 1.6-1 1.8 1.8-1 1.6.7 1.6 1.8.4v2.6l-1.8.4-.7 1.6 1 1.6-1.8 1.8-1.6-1-1.6.7-.4 1.8H8.7l-.4-1.8-1.6-.7-1.6 1-1.8-1.8 1-1.6-.7-1.6-1.8-.4V8.7l1.8-.4.7-1.6-1-1.6 1.8-1.8 1.6 1 1.6-.7z"/><circle cx="10" cy="10" r="2.3"/></svg><span>Settings</span></button>
+    </nav>
+    <main class="viewport">
+      <section id="page-home" class="page home-page" aria-label="Launch game">
+        <div class="intro"><div><p class="eyebrow">POKÉMON COLOSSEUM</p><h1 id="home-title">Set up your game</h1><p id="home-description">A few quick steps, then you're ready to play.</p></div></div>
+
+        <div id="setup-flow" class="setup-flow">
+          <div class="setup-progress" role="group" aria-label="Setup progress"><span id="step-count">Step 1 of 3</span><div class="setup-progress-track" aria-hidden="true"><i></i><i></i><i></i></div></div>
+          <section id="setup-step-1" class="panel setup-step" aria-label="Download setup files and tools">
+            <h2 id="setup-download-title">Download setup files</h2><p id="setup-download-description">We'll get the files and tools needed to prepare your own disc. The game is not included.</p>
+            <div id="repo-location" class="setup-file"><span>Install location</span><strong id="repo-path"></strong></div>
+            <div class="actions"><button id="choose-location" class="subtle">Change location</button></div>
+            <p id="tool-location-note" class="helper">Build tools (a few GB) download to the launcher's own folder.</p>
+            <button id="mac-setup-help" class="subtle" hidden>Mac setup help</button>
+          </section>
+          <section id="setup-step-2" class="panel setup-step" aria-label="Choose disc image" hidden>
+            <div class="setup-step-heading"><h2>Choose your disc image</h2><button class="setup-back" data-setup-back>← Back</button></div>
+            <p>Select a file from your own North American Pokémon Colosseum disc (GC6E01). Use an .iso or .gcm file.</p>
+            <div class="setup-file"><span>Selected file</span><strong id="rom-path">No file selected</strong></div>
+            <div class="actions"><button id="choose-rom" class="subtle" hidden>Change file</button><span class="helper">Your disc image stays on your computer.</span></div>
+          </section>
+          <section id="setup-step-3" class="panel setup-step" aria-label="Begin installation" hidden>
+            <div class="setup-step-heading"><h2>Install your game</h2><button class="setup-back" data-setup-back>← Back</button></div>
+            <p id="setup-install-description">We'll prepare a playable copy using your disc image. This can take a while.</p>
+            <div class="setup-ready-note">Your saved games stay safe and separate from this install.</div>
+          </section>
+        </div>
+
+        <div class="hero-spacer" aria-hidden="true"></div>
+
+        <section class="launch-panel" aria-label="Play game">
+          <div class="launch-primary"><button id="play" class="play">Continue</button><button id="play-more" class="play-more" popovertarget="play-menu" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to play" title="More ways to play" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8"/></svg></button></div>
+          
+          <p id="play-more-hint" class="play-more-hint" hidden></p><div id="play-menu" class="play-menu" popover role="menu" aria-label="Ways to play"><button id="menu-default" class="play-menu-item" role="menuitem" data-kind="update"><svg viewBox="0 0 20 20" aria-hidden="true" class="for-update"><path d="M15.5 8.5A6 6 0 0 0 4.6 6.2M4.5 3v3.4h3.4M4.5 11.5a6 6 0 0 0 10.9 2.3M15.5 17v-3.4h-3.4"/></svg><svg viewBox="0 0 20 20" aria-hidden="true" class="for-play"><path d="M6.5 4.5v11l9-5.5z"/></svg><svg viewBox="0 0 20 20" aria-hidden="true" class="for-hd"><rect x="2.8" y="4.5" width="14.4" height="11" rx="2"/><path d="M6 8v4M9 8v4M6 10h3M11.5 8v4h1.3a2 2 0 0 0 0-4z"/></svg><span><strong id="menu-default-label">Update &amp; play</strong><small id="menu-default-detail"></small></span><em>Default</em></button><button id="menu-update-play" class="play-menu-item" role="menuitem"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 8.5A6 6 0 0 0 4.6 6.2M4.5 3v3.4h3.4M4.5 11.5a6 6 0 0 0 10.9 2.3M15.5 17v-3.4h-3.4"/></svg><span><strong>Update &amp; play</strong><small id="menu-update-play-detail"></small></span></button><button id="menu-update-only" class="play-menu-item" role="menuitem"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9.5M6 8.8l4 4 4-4M4 16.5h12"/></svg><span><strong id="menu-update-only-label">Update only</strong><small id="menu-update-only-detail"></small></span></button><button id="menu-play-now" class="play-menu-item" role="menuitem"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z"/></svg><span><strong>Play now</strong><small id="menu-play-now-detail"></small></span></button><p id="play-menu-note">The default follows <b>Update automatically</b> in Settings.</p></div><div class="task-progress" id="task-progress" role="status" hidden><div class="progress-summary"><span class="spinner" aria-hidden="true"></span><strong id="progress-title">Working…</strong><span id="progress-time"></span><span id="progress-percent"></span></div><p id="progress-detail">Starting…</p><div class="progress-track" id="progress-track" role="progressbar" aria-label="Task progress"><span id="progress-fill"></span></div><button id="view-build-log" class="progress-log-button">View build log</button></div>
+        </section>
+
+      </section>
+      <section id="page-saves" class="page sheet saves-page" aria-labelledby="saves-title" hidden>
+      <div class="modal-head"><div><h1 id="saves-title">Saves</h1><p>Your saved games and their backups.</p></div></div>
+      <div class="modal-body">
+          <div id="pane-saves" class="settings-pane saves-pane">
+            <h2 class="group-title">Saved games</h2>
+            <div class="settings-group">
+              <p class="small-path" id="save-path"></p>
+              <div class="actions"><button class="subtle" id="backup-saves">Back up saves</button><button class="subtle" id="open-backups">Open backup folder</button></div>
+              <div class="path-row"><label class="backup-picker"><span>Restore a backup</span><select id="backup-list"></select></label><button class="subtle" id="restore-saves">Restore backup</button></div>
+              <div id="backup-progress" class="backup-progress" aria-live="polite" hidden></div>
+              <label class="switch"><span><strong>Back up automatically</strong><small>Copies your saves to the backup folder before and after you play, and before updates and cleanup. Off: only Back up saves makes one. Restoring a backup still backs up your current saves first.</small></span><input id="autoBackups" type="checkbox"><i></i></label>
+            </div>
+          </div>
+      </div>
+      </section>
+      <section id="changelog" class="page sheet changelog-page" aria-labelledby="changelog-title" hidden>
+      <div class="modal-head"><div><h1 id="changelog-title">What's new</h1><p id="changelog-subtitle">Launcher and game updates</p></div></div>
+      <div class="modal-body changelog-body">
+        <nav id="changelog-nav" class="changelog-nav" aria-label="Releases"></nav>
+        <div id="changelog-detail" class="changelog-detail">
+          <p id="changelog-status" class="changelog-status" role="status">Loading…</p>
+          <header id="changelog-head" class="changelog-head" hidden><div class="changelog-heading"><h2 id="changelog-version"></h2><span id="changelog-badge" class="badge" hidden></span></div><p id="changelog-meta"></p></header>
+          <div id="changelog-columns" class="changelog-columns"></div>
+        </div>
+        <div class="changelog-actions"><button class="text-button" id="changelog-page">View on GitHub ↗</button></div>
+      </div>
+      </section>
+      <section id="page-settings" class="page sheet settings-page" aria-label="Settings" hidden>
+      <div class="modal-head"><div><h1>Settings</h1><p>Changes save automatically.</p></div></div>
+      <div class="settings-layout">
+        <nav class="settings-nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+          <button id="tab-gameplay" class="settings-tab" role="tab" aria-controls="pane-gameplay" aria-selected="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2.8 2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8l5-.7z"/></svg>Gameplay</button>
+          <button id="tab-display" class="settings-tab" role="tab" aria-controls="pane-display" aria-selected="false"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="10" rx="1.5"/><path d="M7 17h6M10 13.5V17"/></svg>Display</button>
+          <button id="tab-graphics" class="settings-tab" role="tab" aria-controls="pane-graphics" aria-selected="false"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><circle cx="7.5" cy="8" r="1.5"/><path d="m3 15 4.5-4.5 3 3 2.5-2.5 4.5 4.5"/></svg>Graphics</button>
+          <button id="tab-controls" class="settings-tab" role="tab" aria-controls="pane-controls" aria-selected="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6.5h8a4 4 0 0 1 3.9 4.8l-.6 3a2 2 0 0 1-3.4 1L12 13.5H8l-1.9 1.8a2 2 0 0 1-3.4-1l-.6-3A4 4 0 0 1 6 6.5z"/><path d="M6.5 9v3M5 10.5h3M12.5 9.5h.1M14.5 11.5h.1"/></svg>Controls</button>
+          <button id="tab-manage" class="settings-tab" role="tab" aria-controls="pane-manage" aria-selected="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h12M4 10h12M4 16h12"/><circle cx="8" cy="4" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="7" cy="16" r="2"/></svg>Manage game</button>
+          <button id="tab-launcher" class="settings-tab" role="tab" aria-controls="pane-launcher" aria-selected="false"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M10 9v5M10 6.2v.1"/></svg>Launcher</button>
+        </nav>
+
+        <div id="settings-panes" class="settings-panes">
+          <section id="pane-gameplay" class="settings-pane" role="tabpanel" aria-labelledby="tab-gameplay">
+            <h2 class="group-title">Game</h2>
+            <div class="settings-group">
+              <label class="switch"><span><strong>Skip movies</strong><small>Straight past the logos and the game's movies.</small></span><input id="skipMovies" type="checkbox"><i></i></label>
+              <label class="field"><span>Text<small>HD draws the game's fonts sharp from the Inter typeface. Upscaled keeps their original look, enlarged.</small></span><select id="hdText"><option value="on">HD</option><option value="upscaled">Upscaled</option><option value="off">As on the disc</option></select></label>
+            </div>
+            <p class="preset-tip"><strong>Fast-forward:</strong> hold <strong>L + R</strong> (Q + E on the keyboard) to run the game at 4× and skip movies. <strong>A</strong> skips a movie.</p>
+          </section>
+
+          <section id="pane-display" class="settings-pane" role="tabpanel" aria-labelledby="tab-display" hidden>
+            <h2 class="group-title">Screen</h2>
+            <div class="settings-group">
+              <label class="switch"><span><strong>Fullscreen</strong><small>Game fills your display. F11 or Alt+Enter switches while playing.</small></span><input id="fullscreen" type="checkbox"><i></i></label>
+              <label class="field sub"><span>Fullscreen type</span><select id="fullscreenMode"><option value="desktop">Borderless</option><option value="exclusive">Exclusive</option></select></label>
+              <label class="field sub"><span>Fullscreen resolution<small>Changes your display's resolution while the game runs.</small></span><select id="exclusiveResolution"><option value="desktop">Desktop</option></select></label>
+              <label class="field"><span>Monitor</span><select id="display"><option value="launcher">Same as the launcher</option><option value="primary">Primary monitor</option></select></label>
+            </div>
+            <h2 class="group-title">Picture</h2>
+            <div class="settings-group">
+              <label class="field"><span>Screen format<small>The 3D view widens; menus and movies keep their shape.</small></span><select id="widescreen"><option value="auto">As wide as the window</option><option value="16:9">Widescreen 16:9</option><option value="16:10">Widescreen 16:10</option><option value="21:9">Ultrawide 21:9</option><option value="4:3">Original 4:3</option></select></label>
+              <label class="switch sub"><span><strong>Battle panels at edges</strong><small>For widescreen: the battle status panels and title portraits sit at the screen's edges.</small></span><input id="hudEdges" type="checkbox"><i></i></label>
+              <label class="field"><span>Aspect ratio<small>Keep the picture's shape, stretch it to fill the window, or scale it in whole multiples.</small></span><select id="aspect"><option value="keep">Keep</option><option value="stretch">Stretch</option><option value="integer">Whole multiples</option></select></label>
+              <label class="field range-field"><span><strong>Brightness</strong><output id="brightness-value" for="brightness">100%</output></span><input id="brightness" type="range" min="50" max="200" step="5" aria-label="Brightness"></label>
+            </div>
+            <h2 class="group-title">Frame rate</h2>
+            <div class="settings-group">
+              <label class="field"><span>Frame rate</span><select id="frameRate"><option value="30">30 fps (GameCube native)</option><option value="60">60 fps (default)</option></select></label>
+              <label class="field"><span>V-Sync<small>Stops tearing. Adaptive only tears when a frame is late, instead of stuttering.</small></span><select id="vsync"><option value="off">Off</option><option value="on">On</option><option value="adaptive">Adaptive</option></select></label>
+              <label class="switch"><span><strong>Performance overlay</strong><small>Frame rate and timing; the backtick key toggles it.</small></span><input id="overlay" type="checkbox"><i></i></label>
+            </div>
+          </section>
+
+          <section id="pane-graphics" class="settings-pane" role="tabpanel" aria-labelledby="tab-graphics" hidden>
+            <p class="preset-tip"><strong>Still seeing frame drops?</strong> Try a lower screen resolution: under Display, set <strong>Fullscreen type</strong> to Exclusive and choose a lower <strong>Fullscreen resolution</strong>.</p>
+            <h2 class="group-title">Quality</h2>
+            <div class="settings-group">
+              <label class="field" id="renderer-field"><span><strong>Renderer</strong><small id="renderer-note">Vulkan is the port's main renderer. Choose OpenGL if the game has trouble drawing on this computer.</small></span><select id="renderer"><option value="vulkan">Vulkan</option><option value="opengl">OpenGL</option></select></label>
+              <label class="field"><span>Resolution<small>Sharper picture, but costs speed and memory. Native is the GameCube's own.</small></span><select id="resolution"><option value="1">Native (1×)</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option></select></label>
+              <label class="field"><span>Anti-aliasing</span><select id="msaa"><option value="0">Off</option><option value="2">2× MSAA</option><option value="4">4× MSAA</option><option value="8">8× MSAA</option></select></label>
+              <label class="switch"><span><strong>FXAA</strong><small>Also smooths edges MSAA misses, like leaves and fences.</small></span><input id="fxaa" type="checkbox"><i></i></label>
+              <label class="field"><span>Anisotropic filtering<small>Keeps textures sharp at a slant, such as the ground ahead of you.</small></span><select id="anisotropic"><option value="0">Off</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></label>
+              <label class="field range-field"><span><strong>Sharpening</strong><output id="sharpen-value" for="sharpen">Off</output></span><input id="sharpen" type="range" min="0" max="100" step="5" aria-label="Sharpening"></label>
+              <label class="field"><span>Upscaler<small>How the picture fits the window.</small></span><select id="presentFilter"><option value="bilinear">Bilinear</option><option value="sharp">Sharp</option><option value="nearest">Nearest</option><option value="fsr">FSR 1</option><option value="nis">NIS</option></select></label>
+              <label class="field sub" id="fsrMode-field"><span>Upscaling quality</span><select id="fsrMode"><option value="native">Native</option><option value="quality">Quality</option><option value="balanced">Balanced</option><option value="performance">Performance</option><option value="ultraperformance">Ultra Performance</option></select></label>
+              <p class="row-note sub" id="fsr-hint" hidden>FSR 1 (AMD) and NIS (NVIDIA Image Scaling) render below your screen's resolution and upscale with clean edges: Quality at 67%, Balanced 59%, Performance 50%, Ultra Performance 33%, Native at full size. They set the resolution themselves, so Picture sharpness is set aside while one is on. Sharpening sets how crisp they are. Both work on any graphics card.</p>
+            </div>
+            <h2 class="group-title">HD visuals</h2>
+            <div class="settings-group">
+              <label class="switch"><span><strong>HD textures <span id="textures-badge" class="badge">Checking</span></strong><small>All 7,498 of the game's textures, upscaled 4×.</small></span><input id="textures" type="checkbox"><i></i></label>
+              <p class="row-note" id="texture-info">Checking for HD textures…</p>
+              <label class="field sub"><span>HD texture loading<small id="texture-loading-hint">Before each area: an area's HD textures load with it, so they don't pop in while you play.</small></span><select id="textureLoading"><option value="stage">Before each area</option><option value="all">Whole pack</option><option value="play">While playing</option></select></label>
+              <div class="field"><span>Custom textures<small>Put texture packs made for Dolphin here: they replace the HD textures where both change the same texture, and work with HD textures off too.</small></span><button class="subtle" id="open-custom-textures">Open custom textures folder</button></div>
+              <label class="switch"><span><strong>Shader warm-up</strong><small>Builds an area's effects while it loads, so the first moments in it don't stutter.</small></span><input id="shaderWarmup" type="checkbox"><i></i></label>
+            </div>
+          </section>
+
+          <section id="pane-controls" class="settings-pane" role="tabpanel" aria-labelledby="tab-controls" hidden>
+            <div class="controls-head"><h2 class="group-title">Buttons</h2><div class="binding-modes" role="group" aria-label="Show bindings for"><button class="subtle" data-binding-mode="keyboard" aria-pressed="true">Keyboard</button><button class="subtle" data-binding-mode="controller" aria-pressed="false">Controller</button></div></div>
+            <div class="settings-group controls-panel">
+              <div id="binding-list" class="binding-list"></div>
+              <div class="actions"><button class="subtle" id="reset-bindings">Reset all to defaults</button><span id="binding-note" class="helper" role="status">Choose Change, then press a key. Esc cancels.</span></div>
+            </div>
+            <h2 class="group-title">Sticks, triggers, rumble and focus</h2>
+            <div class="settings-group">
+              <label class="field range-field"><span><strong>Stick dead zone</strong><output id="stickDeadzone-value" for="stickDeadzone">10%</output><small>How far a controller's sticks move before the game sees them. Raise it if you walk by yourself, lower it for small movements to count.</small></span><input id="stickDeadzone" type="range" min="0" max="50" step="1" aria-label="Stick dead zone"></label>
+              <label class="field range-field"><span><strong>Trigger click</strong><output id="triggerClick-value" for="triggerClick">85%</output><small>How far an analog trigger goes before it counts as L or R pressed.</small></span><input id="triggerClick" type="range" min="10" max="100" step="5" aria-label="Trigger click"></label>
+              <label class="field range-field"><span><strong>Rumble strength</strong><output id="rumbleStrength-value" for="rumbleStrength">100%</output><small>How hard your controller rumbles; 0% turns rumble off.</small></span><input id="rumbleStrength" type="range" min="0" max="100" step="5" aria-label="Rumble strength"></label>
+              <label class="field"><span>Controllers<small>Each controller is the next free player as it is plugged in, for Battle Mode. The keyboard is player 1.</small></span><select id="padMode"><option value="players">One player each</option><option value="single">All player 1</option></select></label>
+              <label class="switch"><span><strong>Controller works in the background</strong><small>Keeps your controller playing while another window has focus, such as with the game on a second screen. Off, the game ignores input until you click back into it.</small></span><input id="backgroundInput" type="checkbox"><i></i></label>
+            </div>
+            <section id="gc-adapter-note" class="controls-note" aria-label="GameCube adapter" aria-live="polite" hidden><h2>GameCube adapter</h2><p id="gc-adapter-text"></p><div class="actions" id="gc-adapter-actions" hidden><button id="gc-adapter-allow">Allow access</button><button class="subtle" id="gc-adapter-copy">Copy terminal command</button><button class="subtle" id="gc-adapter-check">Check again</button></div><p class="helper" id="gc-adapter-helper"></p></section>
+          </section>
+
+          <section id="pane-manage" class="settings-pane" role="tabpanel" aria-labelledby="tab-manage" hidden>
+            <h2 class="group-title">Game version</h2>
+            <div class="settings-group">
+              <p id="game-update-note" class="row-note lead"></p>
+              <div class="actions"><button class="subtle" id="update-port">Update game</button><button class="subtle" id="play-installed" hidden>Play installed version</button><button class="subtle" id="play-previous" hidden>Play previous version</button><button id="build" class="subtle" hidden>Rebuild game</button></div>
+              <p id="rebuild-note" class="row-note" hidden>Rebuild makes a fresh playable copy. Your saves stay safe.</p>
+            </div>
+            <h2 class="group-title">Files</h2>
+            <div class="settings-group">
+              <div class="path-row"><div><strong>Setup files</strong><span class="small-path" id="settings-repo-path"></span></div><button class="subtle" id="choose-repo-settings">Change folder</button></div>
+              <div class="path-row"><div><strong>Your disc file</strong><span class="small-path" id="settings-rom-path"></span></div><button class="subtle" id="choose-rom-settings">Choose file</button></div>
+              <div class="path-row"><div><strong>Disk space</strong><span class="small-path">Your disc file and saves are kept safe.</span></div><div class="actions"><button class="subtle" id="clean-preview">See removable files</button><button class="subtle danger" id="clean">Free up space</button></div></div>
+              <div class="path-row" id="build-tools-row" hidden><div><strong>Build tools</strong><span class="small-path" id="build-tools-note"></span></div><button class="subtle danger" id="remove-build-tools">Remove build tools</button></div>
+            </div>
+          </section>
+          <section id="pane-launcher" class="settings-pane" role="tabpanel" aria-labelledby="tab-launcher" hidden>
+            <h2 class="group-title">Appearance</h2>
+            <div class="settings-group">
+              <label class="switch"><span><strong>Dark mode</strong><small>Dark Settings, changelog and other windows in the launcher.</small></span><input id="darkMode" type="checkbox"><i></i></label>
+            </div>
+            <h2 class="group-title">Updates</h2>
+            <div class="settings-group">
+              <label class="switch"><span><strong>Update automatically</strong><small>Keeps the launcher current and prepares game updates when you press Play.</small></span><input id="autoUpdate" type="checkbox"><i></i></label>
+            </div>
+            <h2 class="group-title">About</h2>
+            <div class="settings-group">
+              <dl class="version-list"><div><dt>Launcher</dt><dd id="launcher-version"></dd></div><div><dt>Installed game</dt><dd id="installed-game-version"></dd></div><div id="available-game-version-row" hidden><dt>Available game</dt><dd id="available-game-version"></dd></div><div><dt>Build tools</dt><dd><span id="tool-version"></span><small id="tool-version-note"></small></dd></div></dl>
+              <p class="row-note">Built on the pkmn-colosseum decompilation and the renderer of the Super Mario Sunshine PC port. Text is drawn from the Inter typeface. Not affiliated with Nintendo, Creatures, GAME FREAK or The Pokémon Company; no game data is included.</p>
+              <div class="actions"><button class="subtle" id="view-activity-log">View activity log</button><button id="mac-tools-settings" class="subtle" hidden>Mac setup help</button></div>
+            </div>
+          </section>
+        </div>
+      </div>
+      </section>
+    </main>
+    <section id="activity-log" class="activity-drawer" aria-label="Activity log" hidden>
+      <div class="console-header"><svg class="console-symbol" viewBox="0 0 20 20" aria-hidden="true"><path d="m4 5 4 4-4 4m6 0h6"/></svg><strong>Activity log</strong><span id="activity-label" class="console-summary">Nothing running</span><div class="console-actions"><button id="copy-activity-log" class="console-button">Copy log</button><button id="save-activity-log" class="console-button">Save log</button><button id="stop" class="console-button console-stop" hidden>Stop task</button><button id="expand-activity-log" class="console-button console-expand" aria-label="Expand activity log" title="Expand activity log" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8V4h4m4 0h4v4m0 4v4h-4m-4 0H4v-4"/></svg></button><button id="close-activity-log" class="console-button console-close" aria-label="Hide activity log" title="Hide activity log"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div></div>
+      <div id="console-body" class="console-body">
+        <div class="console-output-wrap"><pre id="log" tabindex="0" aria-label="Activity output"></pre><p id="console-empty" class="console-empty"><strong>Ready when you are.</strong><span>Setup and game output will appear here.</span></p></div>
+        <div class="console-footer"><span id="console-entry-count">0 entries</span><span class="console-retention">Showing up to 700 · Copy and Save include the full run</span><span id="copy-log-result" role="status" aria-live="polite"></span><button id="follow-activity-log" class="console-follow" aria-pressed="true">Follow output</button></div>
+      </div>
+    </section>
+
+    <dialog id="mac-tools-help" class="launcher-modal" aria-label="Mac setup help">
+      <div class="modal-head"><div><h1>Prepare this Mac</h1><p>A one-time setup before we can prepare your game.</p></div><button class="modal-close" data-close-modal aria-label="Close Mac setup help">×</button></div>
+      <div class="modal-body">
+        <p class="mac-help-intro">Install Apple's tools once, then the launcher downloads the remaining build tools into its own folder. Follow the steps below, then check again.</p>
+        <ul id="mac-requirements" class="mac-requirements" aria-live="polite"></ul>
+        <p id="mac-apple-note" class="mac-help-intro" hidden>Start with the Apple command below. Finish the installer that opens before continuing.</p>
+        <div id="mac-apple-command"></div>
+        <p id="mac-extra-note" class="mac-help-intro" hidden>Open Terminal and run each remaining command below. Rosetta may ask you to accept Apple's license.</p>
+        <div id="mac-extra-commands"></div>
+        <div class="actions mac-check-actions"><button id="check-mac-tools" class="solid">Check again</button><span id="mac-check-result" role="status"></span></div>
+      </div>
+    </dialog>
+
+    <dialog id="path-too-long" class="launcher-modal path-modal" aria-labelledby="path-too-long-title">
+      <div class="modal-head"><div><p class="eyebrow">CAN'T BUILD HERE</p><h1 id="path-too-long-title">Move the launcher to a shorter folder</h1><p>Windows can't build the game this deep in your folders.</p></div><button class="modal-close" data-close-modal aria-label="Close">×</button></div>
+      <div class="modal-body">
+        <p class="path-summary"><span id="path-folder-name"></span>'s path is <strong id="path-length"></strong> characters long, but the game can only be built in a folder of up to <strong id="path-limit"></strong>.</p>
+        <p class="path-box"><code id="path-folder"></code></p>
+        <p class="path-legend"><span class="path-legend-over" aria-hidden="true"></span><span id="path-over"></span></p>
+        <ol id="path-steps" class="path-steps"></ol>
+        <p id="path-why" class="path-why"></p>
+        <div class="actions path-actions"><button id="path-show-folder" class="subtle">Show in File Explorer</button><button class="solid" data-close-modal>OK</button></div>
+      </div>
+    </dialog>
+
+    <footer class="statusbar"><span class="status-dot" aria-hidden="true"></span><span id="task-status">Loading…</span><span id="status-progress" class="status-progress" hidden><i id="status-progress-fill"></i></span><span class="status-separator">·</span><span id="app-update">Checking for updates…</span><button id="check-updates" class="status-icon" aria-label="Check for launcher and game updates" title="Check for updates"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg></button><button id="install-app-update" class="status-link" hidden>Install now</button><span class="gamepad-hints" aria-hidden="true"><kbd>A</kbd> Select <kbd>B</kbd> Back <kbd>Start</kbd> Settings</span><span class="byo">Bring your own ROM · No game data included</span><button id="toggle-activity-log" class="log-toggle" aria-expanded="false" aria-controls="activity-log" title="Show activity log"><svg class="console-symbol" viewBox="0 0 20 20" aria-hidden="true"><path d="m4 5 4 4-4 4m6 0h6"/></svg>Activity log<span id="console-state" class="console-state">Idle</span><svg class="console-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 12 5-5 5 5"/></svg></button></footer>
+  </div>
+  <script src="bindings.js"></script>
+  <script src="activity-log.js"></script>
+  <script src="changelog-text.js"></script>
+  <script src="gamepad-nav.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

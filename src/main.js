@@ -1,0 +1,1043 @@
+'use strict';
+
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, net, screen } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawn, execFile } = require('node:child_process');
+const port = require('./port');
+const saves = require('./saves');
+const buildTools = require('./build-tools');
+const windowsDlls = require('./windows-dlls');
+const game = require('./game-version');
+const gcAdapter = require('./gc-adapter');
+const appImageUpdate = require('./appimage-update');
+const bindings = require('./bindings');
+const portable = require('./portable');
+const changelog = require('./changelog');
+const { cleanOutputLine, createActivityReader } = require('./progress');
+const { createActivityLog } = require('./activity-log');
+const { observeProcess, exitDescription, failureMessage } = require('./process-output');
+const { createSessionLog } = require('./session-log');
+const displayScale = require('./display-scale');
+
+// Where launcher releases come from.
+const REPOSITORY = { owner: 'chasem-dev', repo: 'colosseum-launcher' };
+const GAME_NAME = 'Pokémon Colosseum';
+const PLAY_LABEL = `Play ${GAME_NAME}`;
+
+let window;
+let config;
+let active = null;
+let preparingTools = false;
+let operation = null;
+// When the player last stopped a task (Stop), so a stopped build isn't tried again.
+let stoppedAt = 0;
+const wasStopped = since => stoppedAt >= since;
+let appUpdate = { state: 'idle', message: '' };
+let updater = null;
+// Before anything reads userData: the single-instance lock is keyed on it too,
+// so each portable folder runs independently of an installed launcher.
+const portableRoot = portable.root();
+if (portableRoot) {
+  fs.mkdirSync(portableRoot, { recursive: true });
+  app.setPath('userData', portableRoot);
+  app.setPath('sessionData', path.join(portableRoot, 'Electron'));
+}
+const activityLog = createActivityLog();
+const partialOutput = new Map();
+const sessionLog = createSessionLog(() => app.getPath('userData'), error =>
+  logOutput(`Could not save the session log: ${error.message}`, 'launcher'));
+const ownsInstance = app.requestSingleInstanceLock();
+if (!ownsInstance) app.quit();
+else if (portableRoot && app.isPackaged)
+  port.useLauncherScripts(portable.copyScripts(path.join(process.resourcesPath, 'scripts'), portableRoot));
+app.on('second-instance', () => showWindow());
+
+function showWindow() {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
+
+function broadcast(channel, data) {
+  if (window && !window.isDestroyed()) window.webContents.send(channel, data);
+}
+
+function activityState() {
+  const task = active || operation;
+  return task ? { label: task.label, detail: task.detail, percent: task.percent,
+    startedAt: task.startedAt, canStop: Boolean(active?.child) } : null;
+}
+
+function log(message) {
+  const lines = String(message).replace(/\r/g, '').split('\n');
+  for (const line of lines) {
+    if (!line) continue;
+    logOutput(cleanOutputLine(line), 'launcher');
+    sessionLog.write(cleanOutputLine(line), 'launcher');
+  }
+}
+
+function logOutput(text, stream, previous) {
+  const entry = activityLog.write(text, stream, previous);
+  if (stream !== 'launcher') partialOutput.set(entry.id, entry);
+  broadcast('log', entry);
+  return entry;
+}
+
+function completeOutput(text, stream, entry) {
+  sessionLog.write(text, stream);
+  if (entry) partialOutput.delete(entry.id);
+}
+
+function flushPartialOutput() {
+  for (const entry of partialOutput.values()) sessionLog.write(entry.text, entry.stream);
+  partialOutput.clear();
+}
+
+// Monitoring preserves Node's normal fatal-error behavior while retaining the
+// diagnostic on disk, even when the launcher cannot keep its window alive.
+process.on('uncaughtExceptionMonitor', error => {
+  log(`Uncaught launcher error: ${error.stack || error.message}`);
+  flushPartialOutput();
+});
+process.on('warning', warning => log(`Launcher warning: ${warning.stack || warning.message}`));
+app.on('render-process-gone', (_event, _contents, details) => {
+  log(`Launcher renderer ${details.reason}: ${exitDescription('Renderer', details.exitCode, null)}`);
+});
+app.on('child-process-gone', (_event, details) => {
+  log(`Launcher ${details.type} process ${details.reason}: ${exitDescription(details.name || details.type, details.exitCode, null)}`);
+});
+
+function currentSource() { return game.release; }
+
+function configFile() { return path.join(app.getPath('userData'), 'preferences.json'); }
+
+function defaultRepo() { return path.join(app.getPath('userData'), 'game'); }
+
+function saveConfig() {
+  const file = configFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temporary = `${file}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(portable.storedPaths(config, portableRoot), null, 2), { mode: 0o600 });
+  fs.renameSync(temporary, file);
+}
+
+function loadConfig() {
+  let saved = {};
+  try { saved = portable.resolvedPaths(JSON.parse(fs.readFileSync(configFile(), 'utf8')), portableRoot); } catch (_) { /* first run */ }
+  config = {
+    repo: typeof saved.repo === 'string' ? saved.repo : defaultRepo(),
+    rom: typeof saved.rom === 'string' ? saved.rom : '',
+    settings: port.normalizeSettings(saved.settings || {}),
+    installRoot: typeof saved.installRoot === 'string' ? saved.installRoot : null,
+    previousInstall: saved.previousInstall || null,
+    completedSetup: Boolean(saved.completedSetup),
+    // The newest launcher version whose changelog the player has been shown.
+    changelogSeen: changelog.baseVersion(saved.changelogSeen)
+  };
+  for (const root of [config.repo, config.previousInstall?.repo].filter(Boolean)) {
+    try { if (game.recoverBuild(root)) log('Recovered your previous game after interrupted setup.'); }
+    catch (error) { log(`Game recovery: ${error.message}`); }
+  }
+  config.completedSetup ||= fs.existsSync(port.binaryPath(config.repo));
+  if (portableRoot) settleMovedPortableFolder();
+}
+
+// A portable folder copied to another drive or computer plays from where it is
+// now: its updates' links follow it, and when the chosen disc stayed behind, a
+// disc kept in the folder or beside the .exe is used.
+function settleMovedPortableFolder() {
+  for (const root of [config.repo, config.previousInstall?.repo].filter(Boolean)) {
+    try {
+      const relinked = game.relinkUserFolders(root, file => portable.relocated(file, portableRoot));
+      if (relinked.length) log(`Reconnected ${relinked.join(', ')} after the portable folder moved.`);
+    } catch (error) { log(`Could not reconnect the game's files after the portable folder moved: ${error.message}`); }
+  }
+  try { port.validateRom(config.rom); return; } catch (_) { /* missing or never chosen */ }
+  const disc = portable.findDisc(portableRoot, port.validateRom);
+  if (!disc) return;
+  config.rom = disc;
+  log(`Using the game disc at ${disc}.`);
+  try { saveConfig(); } catch (error) { log(`Could not save preferences: ${error.message}`); }
+}
+
+async function exclusive(label, callback, newLog = false) {
+  if (operation || active || preparingTools) throw new Error('Wait for the current task to finish, or stop it first.');
+  if (newLog) {
+    activityLog.reset();
+    partialOutput.clear();
+    broadcast('log-reset', activityLog.resetSequence());
+    sessionLog.reset();
+  }
+  operation = { label, detail: 'Starting…', percent: null, startedAt: Date.now() };
+  broadcast('activity', operation);
+  try {
+    if (removingOldVersions) {
+      removingOldVersions.stop = true;
+      await removingOldVersions.done;
+    }
+    return await callback();
+  }
+  catch (caught) {
+    // A full drive, or Windows' Mandatory ASLR breaking MSYS2's fork(), says
+    // what to do about it instead of the raw ENOSPC or Git's fork error.
+    const error = hintedError(caught) || caught;
+    if (!error.activityLogged) {
+      log(`✕ ${label}: ${error.message}`);
+      error.activityLogged = true;
+    }
+    throw error;
+  }
+  finally { operation = null; broadcast('activity', null); }
+}
+
+// Whether a command said so, for the GameCube adapter's checks: its output, or '' when it could not run.
+function commandOutput(command, args) {
+  return new Promise(resolve => execFile(command, args, { timeout: 8000, windowsHide: true }, (error, stdout) => resolve(error ? '' : String(stdout))));
+}
+
+let gcAdapterLogged = '';
+async function gcAdapterStatus() {
+  let status = { present: false };
+  if (process.platform === 'linux') status = gcAdapter.linuxStatus();
+  else if (process.platform === 'win32') {
+    status = gcAdapter.windowsStatus(await commandOutput('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', gcAdapter.WINDOWS_QUERY]));
+  } else if (process.platform === 'darwin') status = gcAdapter.macStatus(await commandOutput('ioreg', ['-p', 'IOUSB', '-l', '-w0']));
+  const line = !status.present ? 'GameCube adapter: none plugged in (Wii U mode).'
+    : status.readable ? `GameCube adapter: plugged in, the game can read it${status.via ? ` (${status.via})` : status.driver ? ` (${status.driver} driver)` : ''}.`
+    : status.fix === 'udev' ? `GameCube adapter: plugged in, but this user can't open it (${[status.hidraw?.file, status.usb?.file].filter(Boolean).join(', ')}); it needs a udev rule.`
+    : status.fix === 'driver' ? `GameCube adapter: plugged in, but Windows has no working driver for it (${status.status || 'no status'}).`
+    : 'GameCube adapter: plugged in, but libusb is not installed (brew install libusb).';
+  if (line !== gcAdapterLogged && (status.present || gcAdapterLogged)) log(line);
+  gcAdapterLogged = line;
+  return status;
+}
+
+// pkexec asks for the password, then installs the rule and applies it to the
+// adapter already plugged in. Without pkexec, or with no password to give (a
+// Steam Deck's user has none until one is set with passwd), the player copies
+// the terminal command instead.
+async function allowGcAdapter() {
+  if (process.platform !== 'linux') return { ok: false, status: await gcAdapterStatus() };
+  const { command, args } = gcAdapter.allowCommand();
+  const error = await new Promise(resolve => execFile(command, args, { timeout: 120000 }, resolve));
+  if (error) {
+    const reason = error.code === 'ENOENT' ? 'pkexec is not installed'
+      : error.code === 126 ? 'the password prompt was closed' : error.code === 127 ? 'the password was not accepted' : error.message.split('\n')[0];
+    log(`GameCube adapter: the udev rule was not installed (${reason}).`);
+    return { ok: false, reason, status: await gcAdapterStatus() };
+  }
+  log(`GameCube adapter: installed ${gcAdapter.RULES_FILE}.`);
+  await new Promise(resolve => setTimeout(resolve, 1500)); // for udev to apply it
+  return { ok: true, status: await gcAdapterStatus() };
+}
+
+function requireRepo() {
+  if (!port.isPort(config.repo)) throw new Error('Download the setup files or choose a folder that already has them.');
+  return config.repo;
+}
+
+function currentSaveDirectory() { return saves.saveDirectory(); }
+
+// The backups the launcher makes by itself, which Back up automatically (Saves) turns off. Back up saves, and the backups
+// before a restore or before moving a build the card is in, still happen.
+const AUTOMATIC_BACKUPS = { 'before-play': 'before playing', 'after-play': 'after playing',
+  'before-port-update': 'before the update', 'before-cleanup': 'before cleanup' };
+
+function makeSaveBackup(reason) {
+  if (active) throw new Error('Stop the running game or task before backing up saves.');
+  if (AUTOMATIC_BACKUPS[reason] && config.settings.autoBackups === false) {
+    log(`Saves not backed up ${AUTOMATIC_BACKUPS[reason]}: automatic backups are off under Saves.`);
+    return { skipped: true };
+  }
+  const result = saves.backupSaves(currentSaveDirectory(), saves.backupRoot(), reason);
+  log(result.empty ? result.message : `Saved ${result.count} memory card file(s) to ${result.directory}`);
+  return result;
+}
+
+async function launch(command, args, options = {}, label = 'Task', isGame = false) {
+  if (active) throw new Error(`Wait for ${active.label} to finish, or stop it first.`);
+  try {
+    log(`▶ ${label}`);
+    // Windows applies windowsHide's "start hidden" to a program's first window,
+    // so the game would run with an invisible window. Detached instead, the game
+    // (a console program) gets no console window and shows its own normally.
+    const windowsGame = isGame && process.platform === 'win32';
+    // Python writes UTF-8, as this log reads it: on Windows it otherwise uses
+    // the system code page, and cp1251 can't print the "ñ" in "Español".
+    const child = spawn(command, args, { ...options, detached: process.platform !== 'win32' || windowsGame,
+      env: { ...(options.env || process.env), PYTHONUNBUFFERED: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+      windowsHide: !windowsGame, stdio: ['ignore', 'pipe', 'pipe'] });
+    active = { label, child, detail: label.includes('build tools') ? 'Downloading and preparing tools…' : 'Starting…',
+      percent: null, startedAt: Date.now() };
+    broadcast('activity', activityState());
+    const recent = [], readActivity = createActivityReader();
+    function line(value, stream, entry) {
+      completeOutput(value, stream, entry);
+      if (!value) return;
+      if (recent.push(value) > 80) recent.shift();
+      const progress = isGame ? null : readActivity(value);
+      if (progress && active && active.child === child) {
+        Object.assign(active, progress);
+        broadcast('activity', activityState());
+      }
+    }
+    const { error, code, signal } = await observeProcess(child, { output: logOutput, line });
+    active = null;
+    broadcast('activity', activityState());
+    if (error) throw error;
+    if (code !== 0 || signal) {
+      throw Object.assign(new Error(failureMessage(label, { code, signal }, recent, { game: isGame })), { exitCode: code, output: recent.slice() });
+    }
+    log(`✓ ${label} finished`);
+    return { ok: true };
+  } catch (error) {
+    log(`✕ ${error.message}`);
+    error.activityLogged = true;
+    throw error;
+  }
+}
+
+async function capture(command, args, cwd, env = process.env) {
+  try {
+    log(`▶ ${command} ${args.join(' ')}`);
+    const child = spawn(command, args, { cwd, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const { error, code, signal, stdout, stderr } = await observeProcess(child, { output: logOutput, line: completeOutput, capture: true });
+    if (error) throw error;
+    if (code !== 0 || signal) throw new Error(`${exitDescription(command, code, signal)}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
+    return stdout.trim();
+  } catch (error) {
+    log(`✕ ${error.message}`);
+    error.activityLogged = true;
+    throw error;
+  }
+}
+
+// The clearer error for a failed step that ran out of disk space or couldn't
+// fork() on Windows, or null (build-tools.js hintedError). exclusive() logs it.
+function hintedError(error) {
+  try { return buildTools.hintedError(error, { dataFolder: app.getPath('userData'), gameFolder: config?.repo }); }
+  catch (_) { return null; }
+}
+
+function toolEnv(base = process.env) {
+  return buildTools.environment(app.getPath('userData'), base);
+}
+
+function toolsStatus() {
+  return buildTools.status(app.getPath('userData'), process.platform, process.env);
+}
+
+async function checkTools(refresh = false) {
+  return buildTools.check(app.getPath('userData'), { refresh });
+}
+
+// A Windows game folder or build tools too deep for the compiler fail deep
+// into the build with "No such file or directory" for a file that is there.
+// The launcher shows this when it opens, and stops before downloading the
+// tools or building. root defaults to where the next game update builds.
+function pathProblem(root = config.repo && game.snapshotPath(config.installRoot || config.repo, currentSource())) {
+  if (process.platform !== 'win32' || !root) return null;
+  return port.longPathProblem(root, { portable: Boolean(portableRoot),
+    folder: portableRoot || path.dirname(config.installRoot || config.repo),
+    msys: process.env.COLO_MSYS2_ROOT || path.join(buildTools.rootFor(app.getPath('userData')), 'msys64') });
+}
+
+// The last one that stopped a build, which the launcher shows in place of the
+// next update's: a fresh build's folder is longer.
+let blockedPath = null;
+function requireShortPaths(root) {
+  const problem = blockedPath = pathProblem(root);
+  if (!problem) return;
+  log(problem.message);
+  throw new Error(problem.message);
+}
+
+async function ensureBuildTools() {
+  await prepareBuildTools();
+  shieldBuildTools();
+}
+
+// Another program's same-named DLLs in System32 stand in for the build tools'
+// own (windows-dlls.js): the compiler then fails without a message, which
+// CMake reports as "not able to compile a simple test program". The prepared
+// tools get their DLLs beside each program that needs them; a player's own
+// MSYS2 is left as it is, with the cause in the activity log.
+let ownToolsWarned = false;
+function shieldBuildTools() {
+  if (process.platform !== 'win32') return;
+  const own = toolsStatus().mode === 'own';
+  if (own && ownToolsWarned) return;
+  const msys = own ? process.env.COLO_MSYS2_ROOT : path.join(buildTools.rootFor(app.getPath('userData')), 'msys64');
+  const result = windowsDlls.shieldToolchain(msys, { place: !own });
+  for (const error of result.errors) log(`Could not give the build tools their own DLL: ${error}`);
+  if (!result.conflicts.length) return;
+  if (own) {
+    ownToolsWarned = true;
+    log(`Windows has its own copies of ${systemDllList(result.conflicts)}, which your MSYS2's compiler loads instead of MSYS2's. ` +
+      'If the build says the compiler is not able to compile a simple test program, remove COLO_MSYS2_ROOT to use the prepared build tools.');
+  } else if (result.placed.length) {
+    log(`Windows has its own copies of ${systemDllList(result.conflicts)}. The build tools now use theirs instead.`);
+  }
+}
+
+function systemDllList(files) {
+  const names = [...new Set(files.map(file => path.basename(file)))];
+  const folders = [...new Set(files.map(file => path.dirname(file)))];
+  return `${names.join(', ')} in ${folders.join(' and ')}`;
+}
+
+async function prepareBuildTools() {
+  requireShortPaths();
+  if (preparingTools) throw new Error('Wait for build tools to finish preparing.');
+  if (active) throw new Error(`Wait for ${active.label} to finish, or stop it first.`);
+  const userData = app.getPath('userData');
+  const forcePrivate = process.env.COLO_FORCE_PRIVATE_TOOLS === '1';
+  if (process.platform === 'darwin') {
+    preparingTools = true;
+    try {
+      const found = await checkTools(true);
+      if (!found.appleReady) throw new Error(found.message);
+      if (found.ready && !forcePrivate) return;
+    } finally { preparingTools = false; }
+  }
+  const found = toolsStatus();
+  if (found.mode === 'private' || (!forcePrivate && found.ready)) return;
+  preparingTools = true;
+  const startedAt = Date.now();
+  log(`Downloading build tools to ${path.dirname(buildTools.rootFor(userData))}.`);
+  active = { label: 'Download build tools', child: null, detail: 'Checking download…', percent: null, startedAt };
+  broadcast('activity', { label: active.label, detail: active.detail, percent: null, startedAt });
+  try {
+    await buildTools.prepare(userData, {
+      forcePrivate,
+      progress(percent, detail) {
+        if (!active || active.child) return;
+        if (detail && detail !== active.detail) log(detail);
+        active.detail = detail || (percent === null ? 'Downloading tools…' : `Downloading tools: ${percent}%`);
+        active.percent = percent;
+        broadcast('activity', { label: active.label, detail: active.detail, percent, startedAt });
+      },
+      async run(command, args, options, label) {
+        active = null;
+        broadcast('activity', null);
+        try { return await launch(command, args, options, label); }
+        finally {
+          if (preparingTools && !active) {
+            active = { label: 'Download build tools', child: null, detail: 'Preparing build tools…', percent: null, startedAt };
+            broadcast('activity', { label: active.label, detail: active.detail, percent: null, startedAt, canStop: false });
+          }
+        }
+      }
+    });
+    log('Build tools are ready.');
+  } catch (error) {
+    // Rare, and the files go again on the next try unless the player acts, so
+    // an alert rather than only a log line.
+    if (error.missingTools && process.platform === 'win32' && window)
+      void dialog.showMessageBox(window, { type: 'warning', buttons: ['OK'],
+        message: 'Build tools are missing files after downloading', detail: error.message }).catch(() => {});
+    throw error;
+  } finally {
+    preparingTools = false;
+    if (active && !active.child && active.startedAt === startedAt) {
+      active = null;
+      broadcast('activity', null);
+    }
+  }
+}
+
+async function updatePort() {
+  requireRepo();
+  port.validateRom(config.rom);
+  if (game.isCurrent(config.repo, currentSource())) {
+    log('Your game is up to date for this launcher release.');
+    return state();
+  }
+  await ensureBuildTools();
+  await build();
+  return state();
+}
+
+async function installPort() {
+  await ensureBuildTools();
+  const destination = config.repo;
+  if (port.isPort(destination)) return { ok: true };
+  if (fs.existsSync(destination)) {
+    if (!fs.statSync(destination).isDirectory() || fs.readdirSync(destination).length)
+      throw new Error('That folder is not empty. Choose another download location.');
+    fs.rmdirSync(destination);
+  }
+  await game.checkout(destination, { run: launch, capture, env: toolEnv(), source: currentSource(), stopped: wasStopped });
+  return { ok: true };
+}
+
+// Manage game → Remove build tools. Only Windows: its game links its libraries in and plays without them
+// (game.playsWithoutTools); on Linux and macOS the game loads libraries from the tools. The tools
+// download again the next time the launcher builds or sets up the game (ensureBuildTools).
+function buildToolsFolder() { return path.dirname(buildTools.rootFor(app.getPath('userData'))); }
+
+async function removeBuildTools() {
+  if (process.platform !== 'win32') throw new Error('On this computer the game runs with libraries from the build tools, so they stay.');
+  if (toolsStatus().mode === 'own') throw new Error('The launcher builds with your own MSYS2 (COLO_MSYS2_ROOT) and never removes it.');
+  requireRepo();
+  if (!binaryReady() || !game.playsWithoutTools(config.repo))
+    throw new Error('The game still needs DLLs from the build tools. Update or rebuild the game, then try again.');
+  const folder = buildToolsFolder();
+  if (operation) {
+    Object.assign(operation, { detail: 'Removing build tools…', percent: null });
+    broadcast('activity', activityState());
+  }
+  try { await fs.promises.rm(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  catch (error) {
+    throw new Error(`Some build tools could not be removed (${error.message}). Close programs using files in ${folder}, then try again.`);
+  }
+  log(`Removed the build tools from ${folder}. The game plays without them; the launcher downloads them again the next time it builds or sets up the game.`);
+  return state();
+}
+
+// The HD texture pack: a release of the port's own, downloaded and unpacked by the launcher's script with the
+// build tools' Python, and shared by every game version (game.carryUserFiles).
+async function installTextures(root = requireRepo()) {
+  await ensureBuildTools();
+  if (config.settings.textures && !port.texturePackInstalled(root)) {
+    const cmd = port.textureCommand(root, process.platform, toolEnv());
+    await launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, 'Install HD textures');
+    if (!port.texturePackInstalled(root)) throw new Error('Texture installer finished without a usable texture pack.');
+  } else if (config.settings.textures) log('HD textures are already installed.');
+  log('HD visuals are ready for the next game launch.');
+  return { installed: true };
+}
+
+function binaryReady(root = config.repo) {
+  return port.isPort(root) && fs.existsSync(port.binaryPath(root));
+}
+
+async function build(forceFresh = false) {
+  const original = requireRepo();
+  const settings = { ...config.settings };
+  const rom = port.validateRom(config.rom);
+  const saveDirectory = currentSaveDirectory();
+  makeSaveBackup('before-port-update');
+  await ensureBuildTools();
+  const source = currentSource();
+  let root = original;
+  const sourceMarker = path.join(root, 'launcher-source.json');
+  const freshPinnedSource = fs.existsSync(sourceMarker) && !binaryReady(root) && game.matchesSource(root, source);
+  if (forceFresh || (!game.isCurrent(root, source) && !freshPinnedSource)) {
+    root = game.snapshotPath(config.installRoot || original, source);
+    if (forceFresh || (fs.existsSync(root) && !game.matchesSource(root, source))) root += `.fresh-${Date.now()}`;
+    if (!fs.existsSync(root)) await game.checkout(root, { run: launch, capture, env: toolEnv(), source, stopped: wasStopped });
+    if (!game.matchesSource(root, source))
+      throw new Error('The update folder has changed. Choose another setup location in Settings and try again.');
+    game.carryUserFiles(original, root);
+  }
+  // A fresh build's folder is longer than the one ensureBuildTools checked.
+  requireShortPaths(root);
+  if (!port.hdVisualsInstalled(root, settings)) await installTextures(root);
+  const env = toolEnv({ ...process.env, NINJA_STATUS: '[%f/%t] ' });
+  const cmd = port.buildCommand(root, process.platform, env);
+  const result = await game.buildSafely(root, saveDirectory,
+    // A build that fails because antivirus deleted or blocked a tool says so instead of the compiler's error.
+    () => launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, 'Build Pokémon Colosseum')
+      .catch(error => {
+        const userData = app.getPath('userData');
+        throw hintedError(error) || buildTools.deletedToolsError(userData) || buildTools.blockedToolError(userData, error.output) || error;
+      }),
+    { source, toolFolder: toolsStatus().mode === 'own' ? null : buildTools.rootFor(app.getPath('userData')) });
+  // Preferences switch only after a successful build. Closing the app or a
+  // failed download/build leaves the last installation selected and playable.
+  const earlier = { ...config };
+  config = { ...config, repo: root, installRoot: config.installRoot || original, completedSetup: true,
+    previousInstall: root !== original && binaryReady(original)
+      ? { repo: original, settings, rom } : config.previousInstall };
+  try { saveConfig(); }
+  catch (error) { config = earlier; throw error; }
+  log(`Game ${source.version} is ready. Your saved games stay in the same folder.`);
+  await removeOldVersions();
+  await removeOldBuildTools();
+  return result;
+}
+
+async function removeOldBuildTools() {
+  const keep = [];
+  let unknown = false;
+  for (const root of [config.repo, config.previousInstall?.repo].filter(Boolean)) {
+    if (!fs.existsSync(port.binaryPath(root))) continue;
+    const tools = game.toolRoot(root);
+    if (tools) keep.push(tools);
+    else unknown = true;
+  }
+  const removed = await buildTools.pruneToolsets(app.getPath('userData'), keep, { leftoversOnly: unknown,
+    onError: (error, item) => log(`Could not remove old build tools ${item}: ${error.message}`) });
+  if (removed.length) log(`Removed ${removed.length === 1 ? 'old build tools' : `${removed.length} old build tool folders`} ` +
+    'that no game version uses any more, to free up disk space.');
+}
+
+// Keep the current and previous game versions; older ones, the first install
+// once two updates replaced it, and the builds a rebuild replaced or left
+// unfinished only take up space.
+async function removeOldVersions(shouldStop) {
+  if (!config.installRoot || !binaryReady()) return;
+  const protect = [currentSaveDirectory(), config.rom, config.previousInstall?.rom];
+  const failed = what => (error, folder) => log(['EBUSY', 'EPERM', 'EACCES'].includes(error.code) && error.path
+    ? `Could not remove all of ${what} ${folder}: another program has ` +
+      `${path.basename(error.path)} open. The launcher tries again the next time it starts.`
+    : `Could not remove ${what} ${folder}: ${error.message}`);
+  const removed = await game.pruneSnapshots(config.installRoot, [config.repo, config.previousInstall?.repo],
+    protect, failed('old game version'), shouldStop);
+  if (removed.length) log(`Removed ${removed.length} old game version${removed.length === 1 ? '' : 's'} to free up disk space.`);
+  let builds = 0;
+  for (const root of [config.repo, config.previousInstall?.repo].filter(Boolean)) {
+    if (shouldStop?.()) break;
+    builds += (await game.pruneBuildLeftovers(root, protect, failed('old game build'), shouldStop)).length;
+  }
+  if (builds) log(`Removed ${builds} replaced or unfinished game build${builds === 1 ? '' : 's'} to free up disk space.`);
+}
+
+// At startup old game versions are removed beside the window rather than as a
+// task: on Windows that can take minutes, and Play or Update & play would have
+// to wait for it. A task stops it after the file it is on (exclusive); the rest
+// goes after the next update or start.
+let removingOldVersions = null;
+function removeOldVersionsInBackground() {
+  const job = { stop: false };
+  job.done = removeOldVersions(() => job.stop)
+    .catch(error => log(`Could not remove old game versions: ${error.message}`))
+    .finally(() => { if (removingOldVersions === job) removingOldVersions = null; });
+  removingOldVersions = job;
+}
+
+async function setupGame() {
+  requireRepo();
+  port.validateRom(config.rom);
+  if (!game.isCurrent(config.repo, currentSource())) await build();
+  else if (!port.hdVisualsInstalled(config.repo, config.settings)) await installTextures();
+  return state();
+}
+
+// Changed keys go to a file of the launcher's own, so a bindings.txt kept by hand in the game folder is left alone.
+function bindingsEnvironment(settings) {
+  if (!Object.keys(settings.keyBindings || {}).length && !Object.keys(settings.padBindings || {}).length) return {};
+  const file = path.join(app.getPath('userData'), 'bindings.txt');
+  fs.writeFileSync(file, bindings.fileText(settings.keyBindings, settings.padBindings));
+  return { COLO_BINDINGS: file };
+}
+
+function customTextureDirectory() { return port.customTextureDirectory(app.getPath('userData')); }
+
+async function play(installation = null) {
+  const root = installation?.repo || requireRepo();
+  // The player's choices, not the build's: an earlier install plays with them too.
+  const settings = installation ? { ...config.settings, textures: installation.settings?.textures ?? config.settings.textures } : config.settings;
+  const rom = port.validateRom(installation?.rom || config.rom);
+  if (!binaryReady(root)) throw new Error('Set up this version of the game before playing.');
+  if (!port.hdVisualsInstalled(root, settings))
+    throw new Error('HD visuals need to be set up. Return to the main screen to finish setup, or turn them off in Settings.');
+  makeSaveBackup('before-play');
+  const cacheFolder = path.join(app.getPath('userData'), 'game-cache');
+  fs.mkdirSync(cacheFolder, { recursive: true });
+  const playEnv = { ...port.buildEnvironment(settings, rom, root, { customTextures: customTextureDirectory() }),
+    ...saves.gameDataEnvironment(), ...bindingsEnvironment(settings),
+    // The renderer's caches, in the launcher's own folder: its default place is shared with the Sunshine port's.
+    SMS_GX_SHADER_CACHE: path.join(cacheFolder, 'gx-programs.bin'), SMS_TEXTURE_PACK_CACHE: path.join(cacheFolder, 'texture-mips') };
+  const recordedTools = game.toolRoot(root);
+  const env = recordedTools ? buildTools.environmentAtRoot(recordedTools, playEnv) : toolEnv(playEnv);
+  const cmd = port.gameRunCommand(root, rom, process.platform, env);
+  try {
+    return await launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, PLAY_LABEL, true);
+  } finally {
+    try { makeSaveBackup('after-play'); }
+    catch (error) { log(`Save backup failed: ${error.message}`); }
+  }
+}
+
+async function launchGame(update = config.settings.autoUpdate) {
+  requireRepo();
+  port.validateRom(config.rom);
+  if (!binaryReady() || (update && !game.isCurrent(config.repo, currentSource()))) await build();
+  if (!port.hdVisualsInstalled(config.repo, config.settings)) await installTextures();
+  return play();
+}
+
+async function playInstalled() {
+  const root = requireRepo();
+  // Playing without setup uses only packs already on disk. Keep the player's
+  // preferences so choosing setup later still installs the requested visuals.
+  const settings = { ...config.settings, textures: config.settings.textures && port.texturePackInstalled(root) };
+  if (settings.textures !== config.settings.textures)
+    log('Playing the installed game without missing HD downloads. Your visual settings are saved for later setup.');
+  return play({ repo: root, settings });
+}
+
+// What the launcher can make again: the game's build output, downloaded archives and old versions.
+async function clean(dryRun) {
+  const root = requireRepo();
+  const build = path.join(root, 'build');
+  const size = folder => {
+    let total = 0;
+    const walk = item => {
+      for (const entry of fs.readdirSync(item, { withFileTypes: true })) {
+        const file = path.join(item, entry.name);
+        if (entry.isDirectory()) walk(file);
+        else if (entry.isFile()) total += fs.statSync(file).size;
+      }
+    };
+    try { walk(folder); } catch (_) { /* gone */ }
+    return total;
+  };
+  const gb = bytes => (bytes / 1e9).toFixed(1);
+  if (dryRun) {
+    log(`Free up space would remove the game's build (${gb(size(build))} GB). The next Play builds it again.`);
+    return { ok: true };
+  }
+  if (saves.cleanupWouldRemoveSaves(root, currentSaveDirectory()))
+    throw new Error('Your memory card is inside a build folder. Move it outside the build folders before cleanup.');
+  makeSaveBackup('before-cleanup');
+  await fs.promises.rm(build, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  log('Removed the game\'s build. It builds again the next time you play.');
+  await removeOldVersions();
+  await removeOldBuildTools();
+  return { ok: true };
+}
+
+function state() {
+  const info = port.platformInfo();
+  let romError = '';
+  if (config.rom) { try { port.validateRom(config.rom); } catch (error) { romError = error.message; } }
+  const repoReady = port.isPort(config.repo);
+  const ready = repoReady && binaryReady();
+  const installedBuild = ready ? game.installed(config.repo) : null;
+  return {
+    config, platform: info, repoReady, portable: Boolean(portableRoot), pathProblem: blockedPath || pathProblem(),
+    // Where the build tools download: the launcher's data folder, wherever the game is installed.
+    toolsFolder: path.dirname(buildTools.rootFor(app.getPath('userData'))),
+    romReady: Boolean(config.rom) && !romError, romError,
+    hdVisualsReady: repoReady && port.hdVisualsInstalled(config.repo, config.settings),
+    texturesInstalled: repoReady && port.texturePackInstalled(config.repo),
+    texturePack: { size: port.TEXTURE_PACK.size, unpacked: port.TEXTURE_PACK.unpacked },
+    binaryReady: ready,
+    tools: toolsStatus(),
+    game: { launcherVersion: app.getVersion(), availableVersion: currentSource().version,
+      installedVersion: installedBuild?.gameVersion || null,
+      installedToolVersion: installedBuild?.toolVersion || null,
+      toolVersion: buildTools.toolsetFor(), needsUpdate: repoReady && !game.isCurrent(config.repo, currentSource()),
+      previousReady: Boolean(config.previousInstall && binaryReady(config.previousInstall.repo)) },
+    active: activityState(), appUpdate, logs: activityLog.snapshot(), logResetSequence: activityLog.resetSequence(),
+    saveDirectory: currentSaveDirectory(), backupDirectory: saves.backupRoot(),
+    backups: saves.listBackups().filter(item => item.source === currentSaveDirectory())
+  };
+}
+
+async function checkAppUpdate() {
+  if (!updater) return appUpdate;
+  try { await updater.checkForUpdates(); }
+  catch (error) {
+    appUpdate = { state: 'error', message: `Launcher update check failed: ${error.message}` };
+    broadcast('app-update', appUpdate);
+    log(appUpdate.message);
+  }
+  return appUpdate;
+}
+
+let releaseNotes = null;
+// The published changelog, or the copy bundled with this launcher when GitHub
+// cannot be reached. Development runs read the local file so edits show.
+async function loadChangelog() {
+  if (releaseNotes) return releaseNotes;
+  let bundled = changelog.normalize(null);
+  try { bundled = changelog.normalize(JSON.parse(fs.readFileSync(path.join(__dirname, '..', changelog.FILE), 'utf8'))); }
+  catch (error) { log(`Could not read the bundled changelog: ${error.message}`); }
+  if (!app.isPackaged && !process.env.COLO_CHANGELOG_URL) return (releaseNotes = bundled);
+  try {
+    const response = await net.fetch(changelog.url(), { cache: 'no-cache', signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    releaseNotes = changelog.merge(changelog.normalize(await response.json()), bundled);
+    return releaseNotes;
+  } catch (error) {
+    log(`Showing the changelog bundled with this launcher: ${error.message}`);
+    return bundled;
+  }
+}
+
+async function changelogState() {
+  const { releases } = await loadChangelog();
+  const options = { current: app.getVersion(), returning: config.completedSetup };
+  return { releases, current: changelog.baseVersion(app.getVersion()),
+    unseen: changelog.unseen(releases, { ...options, seen: config.changelogSeen }).map(release => release.version), beta: null };
+}
+
+// The release only moves forward.
+function markChangelogSeen() {
+  const version = changelog.baseVersion(app.getVersion());
+  if (!version || (config.changelogSeen && changelog.compareVersions(version, config.changelogSeen) <= 0)) return;
+  config.changelogSeen = version;
+  saveConfig();
+}
+
+function setupAppUpdater() {
+  const url = process.env.COLO_LAUNCHER_UPDATE_URL;
+  const bundledFeed = fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'));
+  // The updater would replace a portable launcher with the installer build.
+  if (portableRoot) {
+    appUpdate = portable.updateNotice(app.getVersion(), null);
+    const check = async () => {
+      try {
+        const response = await net.fetch(`https://api.github.com/repos/${REPOSITORY.owner}/${REPOSITORY.repo}/releases/latest`,
+          { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
+        if (response.ok) {
+          const before = appUpdate.state;
+          appUpdate = portable.updateNotice(app.getVersion(), (await response.json())?.tag_name);
+          broadcast('app-update', appUpdate);
+          if (appUpdate.state === 'available' && before !== 'available') log(appUpdate.message);
+        }
+      } catch (_) { /* offline, or GitHub's hourly limit: keep the last notice */ }
+      return appUpdate;
+    };
+    if (app.isPackaged) setTimeout(() => { if (config.settings.autoUpdate) check(); }, 10000);
+    ipcMain.handle('check-app-update', check);
+    return;
+  }
+  if (!app.isPackaged || (!url && !bundledFeed) || (process.platform === 'linux' && !process.env.APPIMAGE)) {
+    appUpdate = { state: 'unconfigured', message: app.isPackaged ? 'Launcher updates are unavailable for this install.' : 'Launcher updates come with new releases.' };
+    ipcMain.handle('check-app-update', () => appUpdate);
+    return;
+  }
+  ({ autoUpdater: updater } = require('electron-updater'));
+  // Updates keep the AppImage's name and folder, so shortcuts to it keep working
+  if (process.platform === 'linux') appImageUpdate.keepAppImagePath(updater);
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true;
+  updater.setFeedURL(url ? { provider: 'generic', url } : { provider: 'github', ...REPOSITORY });
+  const set = (state, message) => {
+    appUpdate = { state, message }; broadcast('app-update', appUpdate);
+    if (state !== 'downloading' || !message.startsWith('Downloading launcher update:')) log(message);
+  };
+  updater.on('checking-for-update', () => set('checking', 'Checking launcher updates…'));
+  updater.on('update-available', info => set('downloading', `Downloading launcher ${info.version}…`));
+  updater.on('update-not-available', () => set('current', 'Launcher is up to date.'));
+  updater.on('download-progress', progress => set('downloading', `Downloading launcher update: ${Math.round(progress.percent)}%`));
+  updater.on('update-downloaded', info => set('ready', `Launcher ${info.version} downloaded; it will install when you quit.`));
+  updater.on('error', error => set('error', `Launcher update check failed: ${error.message}`));
+  const check = () => { if (config.settings.autoUpdate) checkAppUpdate(); };
+  setTimeout(check, 10000);
+  setInterval(check, 30 * 60 * 1000);
+  ipcMain.handle('check-app-update', () => checkAppUpdate());
+  ipcMain.handle('install-app-update', () => {
+    if (appUpdate.state !== 'ready') throw new Error('No launcher update is ready to install.');
+    if (operation || active) throw new Error('Finish the current task or close the game before installing the update.');
+    // Install silently, then relaunch from the installer itself. Opening the
+    // launcher by hand while the installer still runs gets that copy closed.
+    updater.quitAndInstall(true, true);
+  });
+}
+
+function registerHandlers() {
+  ipcMain.handle('copy-activity-log', () => {
+    clipboard.writeText(sessionLog.read([...partialOutput.values()].sort((a, b) => a.id - b.id)));
+    return { copied: true };
+  });
+  ipcMain.handle('save-activity-log', async () => {
+    const chosen = await dialog.showSaveDialog(window, { title: 'Save activity log',
+      defaultPath: path.join(app.getPath('downloads'), 'Colosseum-activity.log'),
+      filters: [{ name: 'Activity log', extensions: ['log'] }] });
+    if (chosen.canceled || !chosen.filePath) return { cancelled: true };
+    sessionLog.save(chosen.filePath, [...partialOutput.values()].sort((a, b) => a.id - b.id));
+    return { saved: true };
+  });
+  const senderWindow = event => BrowserWindow.fromWebContents(event.sender);
+  ipcMain.handle('window-state', event => windowState(senderWindow(event)));
+  ipcMain.handle('window-minimize', event => {
+    const target = senderWindow(event);
+    target?.minimize();
+    return { minimized: target?.isMinimized() || false };
+  });
+  // The middle window button maximizes, which leaves the taskbar or Dock showing. Full screen is F11
+  // (window-toggle-full-screen), and the same button leaves it.
+  ipcMain.handle('window-toggle-maximize', event => {
+    const target = senderWindow(event);
+    if (!target) return windowState(null);
+    if (target.isFullScreen()) target.setFullScreen(false);
+    else if (target.isMaximized()) target.unmaximize();
+    else target.maximize();
+    return windowState(target);
+  });
+  ipcMain.handle('window-toggle-full-screen', event => {
+    const target = senderWindow(event);
+    if (!target) return windowState(null);
+    target.setFullScreen(!target.isFullScreen());
+    return windowState(target);
+  });
+  ipcMain.handle('window-close', event => senderWindow(event)?.close());
+  ipcMain.handle('state', async () => { await checkTools(); return state(); });
+  ipcMain.handle('check-tools', async () => { await checkTools(true); return state(); });
+  ipcMain.handle('copy-mac-command', (_event, index) => {
+    if (process.platform !== 'darwin') throw new Error('This help is for macOS.');
+    const commands = toolsStatus().commands.split('\n').filter(Boolean);
+    if (!Number.isInteger(index) || !commands[index]) throw new Error('Check your Mac tools again.');
+    clipboard.writeText(commands[index]);
+  });
+  ipcMain.handle('save-settings', async (_event, input) => {
+    if (operation || active) throw new Error('Finish the current task before changing settings.');
+    config.settings = port.normalizeSettings(input);
+    saveConfig();
+    return state();
+  });
+  ipcMain.handle('choose-rom', async () => {
+    if (operation || active) throw new Error('Finish the current task before changing game files.');
+    const chosen = await dialog.showOpenDialog(window, {
+      title: `Choose a file from your own ${GAME_NAME} disc`,
+      properties: ['openFile'],
+      filters: [{ name: 'Game disc files', extensions: ['iso', 'gcm'] }, { name: 'All files', extensions: ['*'] }]
+    });
+    if (chosen.canceled) return state();
+    config.rom = port.validateRom(chosen.filePaths[0]);
+    saveConfig();
+    return state();
+  });
+  ipcMain.handle('choose-repo', async () => {
+    if (portableRoot) throw new Error('The portable launcher keeps its setup files in its own folder.');
+    if (operation || active) throw new Error('Finish the current task before changing game files.');
+    const chosen = await dialog.showOpenDialog(window, { title: 'Choose a folder with setup files', properties: ['openDirectory'] });
+    if (chosen.canceled) return state();
+    if (!port.isPort(chosen.filePaths[0])) throw new Error('That folder does not have the setup files this launcher needs.');
+    config.repo = chosen.filePaths[0];
+    config.installRoot = null;
+    config.previousInstall = null;
+    config.completedSetup = fs.existsSync(port.binaryPath(config.repo));
+    saveConfig();
+    return state();
+  });
+  ipcMain.handle('choose-location', async () => {
+    if (portableRoot) throw new Error('The portable launcher keeps its setup files in its own folder.');
+    if (operation || active) throw new Error('Finish the current task before changing game files.');
+    const chosen = await dialog.showOpenDialog(window, { title: 'Choose where to download setup files', properties: ['openDirectory'] });
+    if (chosen.canceled) return state();
+    const destination = path.join(chosen.filePaths[0], 'Colosseum Game');
+    if (fs.existsSync(destination) && (!fs.statSync(destination).isDirectory() || fs.readdirSync(destination).length))
+      throw new Error('That location already has a game setup folder. Choose another location.');
+    config.repo = destination;
+    config.installRoot = null;
+    config.previousInstall = null;
+    config.completedSetup = fs.existsSync(port.binaryPath(config.repo));
+    saveConfig();
+    return state();
+  });
+  const actions = { 'install-port': ['Download port source', installPort],
+    'update-port': ['Update game', updatePort], 'install-textures': ['Install HD textures', () => installTextures()], 'build': ['Build game', () => build(true)],
+    'setup-game': ['Build game', setupGame], 'prepare-game': ['Prepare game', setupGame], 'play': [PLAY_LABEL, playInstalled],
+    'launch-game': ['Prepare game', () => launchGame()], 'update-and-play': ['Prepare game', () => launchGame(true)],
+    'play-previous': [PLAY_LABEL, () => {
+      if (!config.previousInstall) throw new Error('There is no previous version available.');
+      return play(config.previousInstall);
+    }] };
+  for (const [channel, [label, callback]] of Object.entries(actions))
+    ipcMain.handle(channel, () => exclusive(label, callback, ['play', 'launch-game', 'update-and-play', 'play-previous'].includes(channel)));
+  ipcMain.handle('clean-preview', () => exclusive('Preview cleanup', () => clean(true)));
+  ipcMain.handle('backup-saves', () => exclusive('Back up saves', () => makeSaveBackup('manual')));
+  ipcMain.handle('gc-adapter-status', () => gcAdapterStatus());
+  ipcMain.handle('gc-adapter-allow', () => allowGcAdapter());
+  ipcMain.handle('gc-adapter-copy-command', () => clipboard.writeText(gcAdapter.terminalCommand()));
+  ipcMain.handle('restore-saves', async (_event, id) => {
+    if (operation || active) throw new Error('Stop the running game or task before restoring saves.');
+    if (!saves.listBackups().some(item => item.id === id && item.source === currentSaveDirectory()))
+      throw new Error('Choose a backup for this memory card.');
+    const answer = await dialog.showMessageBox(window, {
+      type: 'warning', buttons: ['Cancel', 'Restore memory card'], defaultId: 0, cancelId: 0,
+      message: 'Restore this backup?',
+      detail: "We'll back up your current saves first, then replace matching files."
+    });
+    if (answer.response !== 1) return { cancelled: true };
+    const result = saves.restoreBackup(id, currentSaveDirectory());
+    log(`Restored ${result.restored} memory card file(s) from ${id}.`);
+    return result;
+  });
+  ipcMain.handle('show-path-folder', () => { const problem = blockedPath || pathProblem(); if (problem) shell.showItemInFolder(problem.folder); });
+  ipcMain.handle('open-backups', () => {
+    fs.mkdirSync(saves.backupRoot(), { recursive: true, mode: 0o700 });
+    return shell.openPath(saves.backupRoot());
+  });
+  ipcMain.handle('open-custom-textures', () => {
+    fs.mkdirSync(customTextureDirectory(), { recursive: true });
+    return shell.openPath(customTextureDirectory());
+  });
+  ipcMain.handle('clean', () => exclusive('Clean build output', async () => {
+    const answer = await dialog.showMessageBox(window, {
+      type: 'warning', buttons: ['Cancel', 'Free up space'], defaultId: 0, cancelId: 0,
+      message: 'Remove files the launcher can make again?', detail: 'The next play may take longer. Your disc file and saved games will be kept.'
+    });
+    return answer.response === 1 ? clean(false) : { cancelled: true };
+  }));
+  ipcMain.handle('remove-build-tools', () => exclusive('Remove build tools', async () => {
+    const answer = await dialog.showMessageBox(window, {
+      type: 'warning', buttons: ['Cancel', 'Remove build tools'], defaultId: 0, cancelId: 0,
+      message: 'Remove the build tools?',
+      detail: `They take a few GB in ${buildToolsFolder()} and are only needed to build the game, which plays without them. ` +
+        'The launcher downloads them again when it next needs them: to update or rebuild the game, or to set up HD visuals. ' +
+        'Your game, disc file and saved games are kept.'
+    });
+    return answer.response === 1 ? removeBuildTools() : { cancelled: true };
+  }));
+  ipcMain.handle('stop', () => {
+    if (!active) return false;
+    if (!active.child) return false;
+    stoppedAt = Date.now();
+    if (process.platform === 'win32') spawn('taskkill', ['/PID', String(active.child.pid), '/T', '/F'], { windowsHide: true });
+    else { try { process.kill(-active.child.pid, 'SIGTERM'); } catch (error) { if (error.code !== 'ESRCH') throw error; } }
+    return true;
+  });
+  ipcMain.handle('changelog', () => changelogState());
+  ipcMain.handle('changelog-seen', () => markChangelogSeen());
+  ipcMain.handle('open-changelog-page', () => shell.openExternal(changelog.PAGE_URL));
+}
+
+function windowState(target) {
+  return { fullscreen: target?.isFullScreen() || false, maximized: target?.isMaximized() || false,
+    minimized: target?.isMinimized() || false };
+}
+
+const WINDOW_SIZE = { width: 1080, height: 760, minWidth: 900, minHeight: 600 };
+
+function createWindow() {
+  // Only Windows display scaling is capped: a Mac's Retina 2x is its normal size.
+  const windowsScaling = process.platform === 'win32';
+  const zoom = windowsScaling ? displayScale.displayZoom(screen.getPrimaryDisplay()) : 1;
+  window = new BrowserWindow({
+    ...displayScale.scaledSize(WINDOW_SIZE, zoom),
+    frame: false, backgroundColor: '#1a1420', title: 'Colosseum Launcher',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true }
+  });
+  if (windowsScaling) displayScale.followDisplayScale(window, screen, WINDOW_SIZE, zoom);
+  window.setMenuBarVisibility(false);
+  const sendWindowState = () => broadcast('window-state', windowState(window));
+  for (const event of ['enter-full-screen', 'leave-full-screen', 'maximize', 'unmaximize', 'restore']) window.on(event, sendWindowState);
+  window.loadFile(path.join(__dirname, 'index.html'));
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('console-message', details => {
+    if (details.level === 'error' || details.level === 'warning')
+      log(`Renderer ${details.level}: ${details.message} (${details.sourceId}:${details.lineNumber})`);
+  });
+}
+
+if (ownsInstance) app.whenReady().then(() => {
+  loadConfig();
+  registerHandlers();
+  createWindow();
+  setupAppUpdater();
+  removeOldVersionsInBackground();
+  // The bundled manifest is the update check. Source downloads and builds
+  // start with Update & play, so opening the launcher never changes a game.
+});
+
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+
+app.on('before-quit', () => {
+  flushPartialOutput();
+  // Stop an in-flight compiler before another launcher process can recover it.
+  if (!active?.child || active.label === PLAY_LABEL) return;
+  if (process.platform === 'win32') spawn('taskkill', ['/PID', String(active.child.pid), '/T', '/F'], { windowsHide: true });
+  else { try { process.kill(-active.child.pid, 'SIGTERM'); } catch (_) { /* already exited */ } }
+});
