@@ -234,7 +234,7 @@ test('the launcher\'s patch is applied to the port it pins, and a changed patch 
 
 test('a port that already has the launcher\'s changes keeps them, and is not patched again', { skip: process.platform === 'win32' }, async t => {
   const home = folder(t, 'colo checkout-');
-  const pinned = sourceFrom(home, { 'tools/link.py': 'def nm_file(line): pass\n' });
+  const pinned = sourceFrom(home, { 'tools/unit_cache.py': '' });
   fs.writeFileSync(path.join(home, 'test.patch'), 'this would not apply\n');
   port.useLauncherScripts(home);
   t.after(() => port.useLauncherScripts(null));

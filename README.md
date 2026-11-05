@@ -132,6 +132,10 @@ npm run dist -- --linux --x64     # or --win --x64, --mac --universal
 
 See [docs/build-tools.md](docs/build-tools.md).
 
+### Build caches
+
+Every game version builds in a folder of its own, so a build keeps what it compiled for the next. The game's units go through the port's `tools/unit_cache.py`, keyed on the preprocessed source, flags, symbol tables and tool versions, and the renderer through `ccache`. Results name no path of the build, so they hold in any folder. They live in `compiler-cache` in the launcher's data folder, trimmed to about 2.5 GB, and **Free up space** clears them. A failed build through them is tried once without. **Game build** keeps the same caches between CI runs (`COLO_COMPILER_CACHE_DIR`).
+
 ### Versions and releases
 
 Every push to `main` also rebuilds the Beta (`refresh-beta.yml`, `build.yml`), which checks hourly for new commits on the port's branch. A pull request becomes a preview when **Build launcher** is run by hand with its number. **Game source** under Manage game builds from another port or decomp for testing.

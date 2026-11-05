@@ -38,7 +38,8 @@ openssl version | grep -q '^OpenSSL 3' && legacy=(-legacy)
 openssl pkcs12 -export "${legacy[@]}" -name "$name" -inkey "$work/key.pem" -in "$out/mac-signing.pem" \
   -out "$out/mac-signing.p12" -passout "pass:$password"
 printf '%s\n' "$password" > "$out/mac-signing-password.txt"
-base64 -i "$out/mac-signing.p12" > "$out/MAC_CSC_LINK.txt"
+# One line: GitHub Actions passes it through an env file, and Linux's base64 wraps.
+base64 < "$out/mac-signing.p12" | tr -d '\n' > "$out/MAC_CSC_LINK.txt"
 chmod 600 "$out"/*
 
 cat <<EOF

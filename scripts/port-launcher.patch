@@ -1,8 +1,20 @@
 diff --git a/build.sh b/build.sh
-index d12270f..1556731 100755
+index d12270f..f8c547f 100755
 --- a/build.sh
 +++ b/build.sh
-@@ -25,9 +25,9 @@ ninja -C "$P/build" -f build.ninja -j"$JOBS" game
+@@ -16,18 +16,19 @@ $PY -I "$P/tools/colo-tools/manifest.py" "$DECOMP" "$P/manifest.json" > /dev/nul
+ $PY -I "$P/tools/symbols.py" "$DECOMP/config/GC6E01" "$P/build/syms_main.json"
+ $PY -I "$P/tools/rels.py" > /dev/null
+ $PY -I "$P/tools/units.py" > /dev/null
+-[ -d "$P/build/mirror" ] || "$P/tools/remirror.sh"
++$PY -I "$P/tools/unit_cache.py" id
++[ -d "$P/build/mirror" ] || $PY -I "$P/tools/unit_cache.py" restore-mirror || { "$P/tools/remirror.sh" && $PY -I "$P/tools/unit_cache.py" save-mirror; }
+ [ -f "$P/build/arity.json" ] || echo '{}' > "$P/build/arity.json"
+ $PY -I "$P/tools/gen_build.py"
+-ninja -C "$P/build" -f build.ninja -j"$JOBS" game
++ninja -C "$P/build" -f build.ninja -j"$JOBS" ir
+ # the register pass-through fill (befix.py) needs every function's arity: a second pass
+ # once all definitions exist (it rebuilds only when the table changed)
  $PY -I "$P/tools/arity.py" > /dev/null
  ninja -C "$P/build" -f build.ninja -j"$JOBS" game
  # macOS: x86_64 with Apple's clang and the universal SDL2.framework
@@ -38,8 +50,89 @@ index 0014ee1..4b9dd7c 100644
  #ifdef _WIN32
  #include "win32.h"
  #endif
+diff --git a/tools/cc_unit.py b/tools/cc_unit.py
+index 3ff619c..9ac0154 100644
+--- a/tools/cc_unit.py
++++ b/tools/cc_unit.py
+@@ -8,7 +8,8 @@ The object is ELF for a Linux host. For Windows (COLO_TARGET=windows) the x32 as
+ rewritten for COFF (tools/coffasm.py) and assembled as a Windows object."""
+ import os, runpy, subprocess, sys
+ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+-from cflags import P, M, CLANG, GAME_CFLAGS, WINDOWS
++from cflags import P, M, CLANG, CLANG_INC, GAME_CFLAGS, WINDOWS
++import unit_cache
+ 
+ 
+ def run(cmd, **kw):
+@@ -30,6 +31,10 @@ mode = sys.argv[1]
+ if mode == 'obj':
+     inp, out = sys.argv[2], sys.argv[3]
+     b = out[:-2]
++    key = unit_cache.digest('obj', unit_cache.tool_id(), unit_cache.read(inp)) if unit_cache.DIR else None
++    if key and unit_cache.fetch(key, [('.o', out)]):
++        unit_cache.count(True)
++        sys.exit(0)
+     run(CLANG + ['--target=x86_64-linux-gnux32', '-fno-pic', '-O2', '-Wno-everything', '-S', inp, '-o', b + '.s'])
+     if WINDOWS:
+         script('coffasm.py', [b + '.s', b + '.coff.s'])
+@@ -37,6 +42,9 @@ if mode == 'obj':
+     else:
+         run(CLANG + ['--target=x86_64-linux-gnu', '-c', b + '.s', '-o', out])
+         script('fix32s.py', [out])
++    if key:
++        unit_cache.store(key, [('.o', out)])
++        unit_cache.count(False)
+     sys.exit(0)
+ 
+ src, out, unit, sp, syms = sys.argv[2:7]
+@@ -48,13 +56,37 @@ extra = []
+ if src.endswith('.cpp'):
+     extra = ['-x', 'c++', '-std=gnu++11']
+     flags = [f for f in flags if f != '-fgnu89-inline']
+-run(CLANG + flags + extra + uflags + ['-MD', '-MF', out + '.d', '-MT', out, '-S', '-emit-llvm', src, '-o', b + '.ll'], cwd=M)
+-argv = [b + '.ll', out + '.tmp', '--unit', unit, '--syms', syms, '--srcpath', sp, '--report', b + '.json']
++# a path relative to the mirror, so that the IR names no folder of this build
++rel = os.path.relpath(src, M).replace(os.sep, '/')
++cmd = CLANG + flags + extra + uflags + ['-MD', '-MF', out + '.d', '-MQ', out]
++report = b + '.json'
++
++
++def install(new):
++    """keep the old file (and its timestamp) when nothing changed: the backend step is skipped"""
++    if os.path.exists(out) and open(out, 'rb').read() == open(new, 'rb').read():
++        os.remove(new)
++    else:
++        os.replace(new, out)
++
++
++key = None
++if unit_cache.DIR:
++    # preprocessed, every header the unit reads counts; the line markers would name this folder
++    pre = subprocess.run(cmd + ['-E', '-P', rel], cwd=M, capture_output=True)
++    if pre.returncode == 0:
++        same = [f.replace(P, '').replace(M, '').replace(CLANG_INC, '') for f in flags + extra + uflags]
++        key = unit_cache.digest('ir', unit_cache.tool_id(), pre.stdout, *same, unit, sp, unit_cache.read(syms),
++                                unit_cache.read(P + '/build/arity.json'))
++        if unit_cache.fetch(key, [('.json', report), ('.be.ll', out + '.tmp')]):
++            unit_cache.count(True)
++            install(out + '.tmp')
++            sys.exit(0)
++run(cmd + ['-S', '-emit-llvm', rel, '-o', b + '.ll'], cwd=M)
++argv = [b + '.ll', out + '.tmp', '--unit', unit, '--syms', syms, '--srcpath', sp, '--report', report]
+ if WINDOWS: argv.append('--win64')
+ script('befix.py', argv)
+-# keep the old file (and its timestamp) when nothing changed: the backend step is skipped
+-new = open(out + '.tmp', 'rb').read()
+-if os.path.exists(out) and open(out, 'rb').read() == new:
+-    os.remove(out + '.tmp')
+-else:
+-    os.replace(out + '.tmp', out)
++if key:
++    unit_cache.store(key, [('.json', report), ('.be.ll', out + '.tmp')])
++    unit_cache.count(False)
++install(out + '.tmp')
 diff --git a/tools/cflags.py b/tools/cflags.py
-index 575e5db..585c21b 100644
+index 575e5db..a4eea85 100644
 --- a/tools/cflags.py
 +++ b/tools/cflags.py
 @@ -25,11 +25,13 @@ def _clang_inc():
@@ -58,7 +151,7 @@ index 575e5db..585c21b 100644
 +                '-include @P@/port_include/colo_compat.h -I@M@/include -I@M@/geninclude -I@M@ -DBUILD_VERSION=0 -DVERSION_GC6E01 -DNDEBUG=1 -DTARGET_PC=1 '
 +                '-std=gnu99 -Wno-everything -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion '
 +                '-Wno-error=incompatible-pointer-types -Wno-error=return-type -Wno-error=incompatible-function-pointer-types '
-+                '-fno-discard-value-names -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks -fgnu89-inline -O0 -Xclang -disable-O0-optnone -g0'
++                '-fmacro-prefix-map=@M@/= -fmacro-prefix-map=@P@/= -fno-discard-value-names -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks -fgnu89-inline -O0 -Xclang -disable-O0-optnone -g0'
 +                ).split()] + shlex.split(os.environ.get('COLO_EXTRA_CFLAGS', ''))
  if WINDOWS:
      GAME_CFLAGS.append('-DCOLO_WIN64=1')
@@ -98,7 +191,7 @@ index d2beda4..b8d9b55 100644
      export MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET:-11.0}
  elif [ -z "$COLO_CLANG" ] && [ -x /mnt/10tbhdd/colosseum-port/colo-tools/clang ]; then
 diff --git a/tools/gen_build.py b/tools/gen_build.py
-index 35aab70..c4a10b3 100644
+index 35aab70..51d59c1 100644
 --- a/tools/gen_build.py
 +++ b/tools/gen_build.py
 @@ -20,14 +20,16 @@ for _objs in _man.values():
@@ -131,7 +224,7 @@ index 35aab70..c4a10b3 100644
      objs.append(o)
  # port-owned units compiled like game code; srcpath names the decomp unit whose statics they share
  import glob
-@@ -54,9 +56,9 @@ for src in sorted(glob.glob(P + '/port_src/*.c')):
+@@ -54,9 +56,11 @@ for src in sorted(glob.glob(P + '/port_src/*.c')):
      sp = m.group(1) if m else 'port/' + base + '.c'
      ll = unit_rules(o, src)
      L.append('  unit = port_%s' % base); L.append('  srcpath = %s' % sp); L.append('  uflags = '); L.append('  syms = %s/build/syms_main.json' % P)
@@ -140,19 +233,27 @@ index 35aab70..c4a10b3 100644
      objs.append(o)
 -L.append('build game: phony ' + ' '.join(objs))
 +L.append('build game: phony ' + ' '.join(n(o) for o in objs))
++# the first pass needs only the IR (tools/arity.py reads it), not objects it would replace
++L.append('build ir: phony ' + ' '.join(n(o[:-2] + '.be.ll') for o in objs))
  # ninja reads a drive letter's colon (C:/...) as the end of the outputs: escape it
  L = [re.sub(r'(?<![\w$])([A-Za-z]):/', r'\1$:/', l) if l.startswith('build ') else l for l in L]
  open(P + '/build/build.ninja', 'w').write('\n'.join(L) + '\n')
 diff --git a/tools/link.py b/tools/link.py
-index 14937c9..428d833 100644
+index 14937c9..41ec653 100644
 --- a/tools/link.py
 +++ b/tools/link.py
-@@ -66,11 +66,14 @@ def sh(cmd, **kw):
+@@ -66,11 +66,20 @@ def sh(cmd, **kw):
      if r.returncode: sys.stderr.write(r.stdout + r.stderr); raise SystemExit('failed: %s' % (cmd if isinstance(cmd, str) else ' '.join(cmd))[:300])
      return r.stdout
  
 +# a response file's arguments, quoted: a path can hold a space
 +def rsp(args): return '\n'.join('"%s"' % a.replace('\\', '\\\\').replace('"', '\\"') for a in args)
++
++def cache_report():
++    if os.path.exists(B + '/unit-cache.log'):
++        log = open(B + '/unit-cache.log', 'rb').read()
++        print('unit cache: %d of %d steps reused' % (log.count(b'h'), len(log)))
++        os.remove(B + '/unit-cache.log')
 +
  # ---- host objects
  HOST_C = sorted(glob.glob(P + '/host/*.c'))
@@ -163,7 +264,7 @@ index 14937c9..428d833 100644
  INC = ['-I' + P + '/host', '-I' + SMSGX + '/include', '-I' + SMSGX + '/src', '-I' + SMSGX + '/port_include',
         '-I' + SMS_SRC + '/port_include', '-I' + SMS + '/decomp/include',
         '-I' + SMS + '/decomp/libs/dolphin/include', '-I' + SMS_SRC, '-I' + SDL_INC,
-@@ -128,13 +131,26 @@ if not os.path.exists(ver) or open(ver).read() != open(redef).read(): open(ver,
+@@ -128,13 +137,26 @@ if not os.path.exists(ver) or open(ver).read() != open(redef).read(): open(ver,
  list(ThreadPoolExecutor(os.cpu_count() or 4).map(objcopy, objs))
  
  # ---- symbols
@@ -192,7 +293,7 @@ index 14937c9..428d833 100644
          for l in out.splitlines():
              parts = l.split()
              if len(parts) >= 3 and len(parts[-2]) == 1:
-@@ -142,7 +158,7 @@ def nm(paths, macho=False, where=None):
+@@ -142,7 +164,7 @@ def nm(paths, macho=False, where=None):
                  if t == 'U': u.add(n)
                  elif t in 'TWDBRCVGS' or (macho and t == 'I') or (t in 'tdbr' and n.startswith('colo.')):
                      d.setdefault(n, t)
@@ -201,7 +302,7 @@ index 14937c9..428d833 100644
              elif len(parts) == 2 and parts[0] == 'U': u.add(name(parts[1]))
              elif len(parts) >= 2 and parts[-2] == 'U': u.add(name(parts[-1]))
      return d, u
-@@ -183,8 +199,13 @@ elif MAC:
+@@ -183,8 +205,13 @@ elif MAC:
          for blk in re.findall(r'symbols:\s*\[([^\]]*)\]', t):
              for s in re.findall(r"'?_([A-Za-z0-9_$.]+)'?", blk): libc.add(s)
  else:
@@ -217,7 +318,7 @@ index 14937c9..428d833 100644
              p = l.split()
              if len(p) >= 3: libc.add(p[2].split('@')[0])
  
-@@ -292,7 +313,7 @@ if WIN:
+@@ -292,7 +319,7 @@ if WIN:
  else:
      cmd = ['g++', '-no-pie', '-o', out, '-Wl,-Ttext-segment=0x20000000', '-Wl,--no-warn-rwx-segments', '-Wl,--allow-multiple-definition', '-rdynamic', WRAP] + host_objs + gen_objs + objs + \
            GX_LIBS + [L + '/syms.ld', '-lSDL2', '-lEGL', '-ldl', '-lpthread', '-lm']
@@ -226,8 +327,13 @@ index 14937c9..428d833 100644
  r = subprocess.run(['g++', '@' + L + '/cmd.rsp'], capture_output=True, text=True)
  errs = r.stderr
  open(L + '/link.log', 'w').write(errs)
+@@ -302,3 +329,4 @@ if r.returncode:
+     print('\n'.join(lines[:40]))
+     raise SystemExit(1)
+ print('linked', out)
++cache_report()
 diff --git a/tools/link_macos.py b/tools/link_macos.py
-index b0370a3..7ba1c07 100644
+index b0370a3..a4a97d7 100644
 --- a/tools/link_macos.py
 +++ b/tools/link_macos.py
 @@ -46,10 +46,10 @@ def link(g):
@@ -262,6 +368,11 @@ index b0370a3..7ba1c07 100644
      r = subprocess.run(g['HOSTCXX'] + ['@' + L + '/cmd.rsp'], capture_output=True, text=True)
      errs = '\n'.join(l for l in r.stderr.splitlines() if '-no_pie is deprecated' not in l)
      open(L + '/link.log', 'w').write(errs)
+@@ -179,3 +179,4 @@ def link(g):
+     # an ad-hoc signature (the linker's is invalidated by nothing here, but keep it valid)
+     subprocess.run(['codesign', '-s', '-', '-f', EXE], capture_output=True)
+     print('linked', EXE)
++    g['cache_report']()
 diff --git a/tools/remirror.sh b/tools/remirror.sh
 index 3878800..8218cf5 100755
 --- a/tools/remirror.sh
@@ -299,3 +410,147 @@ index 3878800..8218cf5 100755
 +rm -rf "$NEW"
  $PY -c "
  import json; b=json.load(open('$P/build/fixconf.json')); json.dump(sorted(b), open('$P/build/skip_units.json','w')); print('skipped units:', len(b))"
+diff --git a/tools/unit_cache.py b/tools/unit_cache.py
+new file mode 100644
+index 0000000..95eb9fa
+--- /dev/null
++++ b/tools/unit_cache.py
+@@ -0,0 +1,138 @@
++#!/usr/bin/env python3
++"""A cache of what game units compile to, for builds in another folder or of another version.
++
++COLO_UNIT_CACHE names its folder; without it nothing here does anything. An entry's key is a hash of everything
++its result depends on, never of a timestamp or a path:
++* a unit's IR: the unit as preprocessed (so every header it reads counts), its flags, the symbols and arity tables
++  befix.py reads, and the tool id;
++* an object: its rewritten IR and the tool id;
++* the mirror: the decomp's commit, the port's tools and headers, and the tool id.
++The tool id is the compiler's version, the system targeted and the scripts that write these results.
++Compiled results name no path of the build (cflags.py maps them away), so they hold in any folder. Anything that
++goes wrong here counts as a miss: the build then compiles as it would have.
++  unit_cache.py id                 write build/tool-id
++  unit_cache.py restore-mirror     unpack the mirror when it is cached (exit 1 when not)
++  unit_cache.py save-mirror        keep the mirror just made
++"""
++import glob, hashlib, io, os, shlex, subprocess, sys, tarfile
++
++P = (os.environ.get('COLO_PORT') or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))).replace(os.sep, '/')
++DIR = os.environ.get('COLO_UNIT_CACHE')
++ID_FILE = P + '/build/tool-id'
++STATS = P + '/build/unit-cache.log'
++TOOLS = ('befix', 'cc_unit', 'cflags', 'coffasm', 'fix32s', 'unit_cache')
++MIRROR_FILES = ('unit_flags.json', 'skip_units.json', 'fixconf.json')
++
++
++def digest(*parts):
++    h = hashlib.sha256()
++    for part in parts:
++        b = part if isinstance(part, bytes) else str(part).encode()
++        h.update(len(b).to_bytes(8, 'little'))
++        h.update(b)
++    return h.hexdigest()
++
++
++def read(path):
++    try:
++        with open(path, 'rb') as f: return f.read()
++    except OSError:
++        return b''
++
++
++def tool_id(): return read(ID_FILE)
++
++
++def entry(key, suffix): return os.path.join(DIR, key[:2], key + suffix)
++
++
++def count(hit):
++    try:
++        with open(STATS, 'ab') as f: f.write(b'h' if hit else b'm')
++    except OSError:
++        pass
++
++
++def fetch(key, pairs):
++    """pairs: (suffix, destination), all or none. True when the files are in place."""
++    try:
++        for suffix, _ in pairs:
++            if not os.path.isfile(entry(key, suffix)): return False
++        for suffix, dest in pairs:
++            data = read(entry(key, suffix))
++            with open(dest + '.fetch', 'wb') as f: f.write(data)
++            os.replace(dest + '.fetch', dest)
++            os.utime(entry(key, suffix))   # the launcher removes what was used longest ago
++        return True
++    except OSError:
++        return False
++
++
++def store(key, pairs):
++    """written beside its place and renamed in, so a reader never sees half a file"""
++    try:
++        os.makedirs(os.path.dirname(entry(key, '')), exist_ok=True)
++        for suffix, source in pairs:
++            temporary = '%s.%d.tmp' % (entry(key, suffix), os.getpid())
++            with open(temporary, 'wb') as f: f.write(read(source))
++            os.replace(temporary, entry(key, suffix))
++    except OSError:
++        pass
++
++
++def write_id():
++    clang = shlex.split(os.environ.get('COLO_CLANG', 'clang'), posix=True)
++    version = subprocess.run(clang + ['--version'], capture_output=True).stdout
++    # the first line names the compiler: the rest is where this copy of it is
++    parts = [version.split(b'\n')[0], os.environ.get('COLO_TARGET') or sys.platform]
++    parts += [read('%s/tools/%s.py' % (P, name)) for name in TOOLS]
++    text = digest(*parts).encode()
++    if read(ID_FILE) != text:
++        with open(ID_FILE, 'wb') as f: f.write(text)
++
++
++def mirror_key():
++    decomp = os.environ.get('DECOMP', '')
++    commit = subprocess.run(['git', '-C', decomp, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
++    if not commit: return None
++    files = sorted(glob.glob(P + '/tools/*.py') + glob.glob(P + '/tools/*.sh') + glob.glob(P + '/tools/asm_c/**', recursive=True)
++                   + glob.glob(P + '/port_include/**', recursive=True))
++    return digest('mirror', tool_id(), commit, *[x for f in files if os.path.isfile(f) for x in (os.path.relpath(f, P), read(f))])
++
++
++def restore_mirror():
++    if not DIR: return 1
++    key = mirror_key()
++    if not key or not os.path.isfile(entry(key, '.tar')): return 1
++    try:
++        with tarfile.open(entry(key, '.tar')) as tar:
++            tar.extractall(P + '/build', filter='data')
++        os.utime(entry(key, '.tar'))
++    except (OSError, tarfile.TarError):
++        return 1
++    print('mirror: reused')
++    return 0
++
++
++def save_mirror():
++    if not DIR: return 0
++    key = mirror_key()
++    if not key: return 0
++    try:
++        os.makedirs(os.path.dirname(entry(key, '')), exist_ok=True)
++        temporary = '%s.%d.tmp' % (entry(key, '.tar'), os.getpid())
++        with tarfile.open(temporary, 'w') as tar:
++            tar.add(P + '/build/mirror', arcname='mirror')
++            for name in MIRROR_FILES:
++                if os.path.exists(P + '/build/' + name): tar.add(P + '/build/' + name, arcname=name)
++        os.replace(temporary, entry(key, '.tar'))
++    except OSError:
++        pass
++    return 0
++
++
++if __name__ == '__main__':
++    command = sys.argv[1]
++    if command == 'id': write_id()
++    elif command == 'restore-mirror': sys.exit(restore_mirror())
++    elif command == 'save-mirror': sys.exit(save_mirror())

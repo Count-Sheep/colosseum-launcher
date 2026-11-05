@@ -14,7 +14,7 @@ async function main() {
     const archive = path.join(directory, asset.name);
     await tools.fetchVerified(asset.url, archive, asset.sha256);
     if (process.env.COLO_RELEASE_TAG)
-      execFileSync('gh', ['release', 'upload', process.env.COLO_RELEASE_TAG, archive,
+      execFileSync('gh', ['release', 'upload', process.env.COLO_RELEASE_TAG, archive, '--clobber',
         '--repo', process.env.GITHUB_REPOSITORY || 'chasem-dev/colosseum-launcher'], { stdio: 'inherit' });
   }
 }

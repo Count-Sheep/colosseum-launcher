@@ -9,6 +9,7 @@ const path = require('node:path');
 const buildTools = require('../src/build-tools');
 const port = require('../src/port');
 const game = require('../src/game-version');
+const compilerCache = require('../src/compiler-cache');
 const windowsDlls = require('../src/windows-dlls');
 const { execFileSync, spawnSync } = require('node:child_process');
 const capture = async (command, args, cwd, env) => execFileSync(command, args, { cwd, env, encoding: 'utf8' }).trim();
@@ -105,9 +106,14 @@ async function main() {
   await game.checkout(root, { git, run, capture, env });
   if (!port.isPort(root)) throw new Error('The checkout is not a complete game folder.');
   if (!game.matchesSource(root)) throw new Error('The checkout does not match game-release.json.');
-  const cmd = port.buildCommand(root, platform, env);
+  // Through the caches, as a player's build goes: CI keeps them in COLO_COMPILER_CACHE_DIR between runs.
+  const buildEnv = compilerCache.environment(env, await compilerCache.prepare(userData, { log: text => process.stdout.write(`${text}\n`) }),
+    { userData, root });
+  const cmd = port.buildCommand(root, platform, buildEnv);
   await game.buildSafely(root, path.join(scratch, 'Saves'), () => run(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, 'Build the game'),
     { backups: path.join(scratch, 'Backups'), toolFolder: toolRoot });
+  const { removed, bytes } = await compilerCache.trim(userData);
+  process.stdout.write(`Unit cache: ${Math.round(bytes / 1048576)} MB kept, ${removed} files removed.\n`);
   const binary = port.binaryPath(root);
   const type = executableType(binary);
   if (type !== EXPECTED[platform]) throw new Error(`The game is ${type}, not ${EXPECTED[platform]}.`);
