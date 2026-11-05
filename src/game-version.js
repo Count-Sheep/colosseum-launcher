@@ -64,11 +64,11 @@ async function patchPort(directory, source, { git, run, env }) {
   if (fs.existsSync(link) && fs.readFileSync(link, 'utf8').includes(DEBIAN_LIBC)) await apply(port.launcherScript(LIBC_PATCH));
 }
 
-// What a game version is made from: the port, the decomp it compiles and the renderer's sources (with the
-// Super Mario Sunshine decomp whose headers those use), each at one commit (game-release.json), and the tools.
+// What a game version is made from: the port, the decomp it compiles and, for an older port, the renderer's sources
+// (with the Super Mario Sunshine decomp whose headers those use), each at one commit (game-release.json), and the tools.
 function identity(platform = process.platform, arch = process.arch, source = release) {
   const asset = tools.assetFor(platform, arch);
-  return { schema: 1, gameVersion: source.version, commit: source.commit, decomp: source.decomp, renderer: source.renderer.commit,
+  return { schema: 1, gameVersion: source.version, commit: source.commit, decomp: source.decomp, renderer: source.renderer?.commit ?? null,
     portPatch: patchHash(source),
     platform, hostArch: arch, toolVersion: tools.toolsetFor(platform, arch), toolSha256: asset.sha256 };
 }
@@ -97,7 +97,8 @@ function playsWithoutTools(root, platform = process.platform, environment = proc
 
 function matchesSource(root, source = release) {
   const { decomp, renderer } = port.dependencyPaths(root);
-  return gitRevision(root) === source.commit && gitRevision(decomp) === source.decomp && gitRevision(renderer) === source.renderer.commit;
+  return gitRevision(root) === source.commit && gitRevision(decomp) === source.decomp &&
+    (!source.renderer || gitRevision(renderer) === source.renderer.commit);
 }
 
 function isCurrent(root, source = release, base = portable.root()) {
@@ -114,7 +115,7 @@ function isCurrent(root, source = release, base = portable.root()) {
 // tells versions apart (the computer's system, the tools).
 function snapshotPath(base, source = release) {
   const expected = identity(undefined, undefined, source);
-  const hash = crypto.createHash('sha256').update([source.decomp, source.renderer.commit, expected.portPatch, tools.platformId(), expected.toolSha256].join('|')).digest('hex').slice(0, 4);
+  const hash = crypto.createHash('sha256').update([source.decomp, source.renderer?.commit, expected.portPatch, tools.platformId(), expected.toolSha256].join('|')).digest('hex').slice(0, 4);
   return path.join(`${base}.releases`, `${source.commit.slice(0, 7)}-${hash}`);
 }
 
@@ -153,9 +154,9 @@ async function shallowCheckout(directory, repository, commit, label, { git, fetc
     throw new Error('The downloaded game files did not match this release. Please retry.');
 }
 
-// The game folder: the port, with deps/pkmn-colosseum (the decomp) and deps/sms-pc-port (the renderer's
-// sources and headers, its decomp submodule at deps/sms-pc-port/decomp) inside it. Built in a temporary folder and
-// moved into place whole, so a game folder is complete or not there.
+// The game folder: the port, with deps/pkmn-colosseum (the decomp) inside it and, for an older port, deps/sms-pc-port
+// (the renderer's sources and headers, its decomp submodule at deps/sms-pc-port/decomp). Built in a temporary folder
+// and moved into place whole, so a game folder is complete or not there.
 async function checkout(root, { git = 'git', run, capture, env, source = release,
   stopped, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   const fetch = (args, options, label) => download(git, args, options, label, { run, stopped, wait });
@@ -170,8 +171,10 @@ async function checkout(root, { git = 'git', run, capture, env, source = release
       await patchPort(temporary, source, tools);
     const { decomp, renderer } = port.dependencyPaths(temporary);
     await shallowCheckout(decomp, source.decompRepository, source.decomp, 'decomp source', tools);
-    await shallowCheckout(renderer, source.renderer.repository, source.renderer.commit, 'renderer source', tools);
-    await shallowCheckout(path.join(renderer, 'decomp'), source.renderer.decompRepository, source.renderer.decomp, 'renderer headers', tools);
+    if (source.renderer) {
+      await shallowCheckout(renderer, source.renderer.repository, source.renderer.commit, 'renderer source', tools);
+      await shallowCheckout(path.join(renderer, 'decomp'), source.renderer.decompRepository, source.renderer.decomp, 'renderer headers', tools);
+    }
     // deps/ is no part of the port's history
     fs.appendFileSync(path.join(temporary, '.git', 'info', 'exclude'), '/deps/\n/launcher-source.json\n');
     fs.writeFileSync(path.join(temporary, 'launcher-source.json'), JSON.stringify(source, null, 2));

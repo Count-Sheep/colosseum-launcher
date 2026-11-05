@@ -1,12 +1,14 @@
 'use strict';
 
-// What a commit of the port builds with: it names the decomp and the renderer in tools/ci/linux-build.sh, and the
-// renderer names its headers' repository as a submodule. Used by npm run update:game and, for Beta, by CI.
+// What a commit of the port builds with: it names the decomp in tools/ci/linux-build.sh. An older commit names the
+// renderer there too, and the renderer names its headers' repository as a submodule. Used by npm run update:game and,
+// for Beta, by CI.
 //   node scripts/game-pins.js   the newest commit of game-release.json's branch, as GitHub Actions outputs
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { OLDER_RENDERER, rendererPin } = require('../src/game-source');
 
 function inTemporaryRepository(callback) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'colo-pins-'));
@@ -26,7 +28,7 @@ function pinsAt(repository, commit) {
   return inTemporaryRepository(git => {
     git(['fetch', '-q', '--depth', '1', repository, commit]);
     const script = git(['show', `${commit}:tools/ci/linux-build.sh`]);
-    return { decomp: pinned(script, 'DECOMP_REF'), renderer: pinned(script, 'SMS_PORT_REF') };
+    return { decomp: pinned(script, 'DECOMP_REF'), renderer: rendererPin(script) };
   });
 }
 
@@ -49,8 +51,8 @@ if (require.main === module) {
   const release = require('../src/game-release.json');
   const commit = newestCommit(release.repository, release.branch);
   const { decomp, renderer } = pinsAt(release.repository, commit);
-  const headers = rendererHeaders(release.renderer.repository, renderer);
-  const lines = [`commit=${commit}`, `decomp=${decomp}`, `renderer=${renderer}`, `renderer_decomp=${headers.decomp}`];
+  const headers = renderer ? rendererHeaders(OLDER_RENDERER.repository, renderer) : {};
+  const lines = [`commit=${commit}`, `decomp=${decomp}`, `renderer=${renderer || ''}`, `renderer_decomp=${headers.decomp || ''}`];
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join('\n')}\n`);
   process.stdout.write(`${lines.join('\n')}\n`);
 }

@@ -9,6 +9,10 @@ const { execFileSync } = require('node:child_process');
 const source = require('../src/game-source');
 const release = require('../src/game-release.json');
 
+// The renderer tests below are of a release that names one, which a release of an older port does.
+release.renderer ??= { repository: 'https://example.invalid/renderer.git', commit: 'c'.repeat(40),
+  decompRepository: 'https://example.invalid/headers.git', decomp: 'd'.repeat(40) };
+
 const capture = async (command, args, cwd, env) => execFileSync(command, args, { cwd, env, encoding: 'utf8' }).trim();
 const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8',
   env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } }).trim();
@@ -67,6 +71,14 @@ test('resolves a fork branch and reads the decomp and renderer commits it names'
     // A commit that doesn't name what it builds with says so.
     commit(port, 'feature', 'tools/ci/linux-build.sh', 'nothing here\n');
     await assert.rejects(source.resolve({ port: { repository: port, ref: 'feature' } }, { capture, env: process.env }), /does not pin DECOMP_REF/);
+
+    // A port that keeps the renderer in its own tree names none, so there is nothing more to look up.
+    const carries = commit(port, 'feature', 'tools/ci/linux-build.sh', `DECOMP_REF=${pin}\n`);
+    const own = await source.resolve({ port: { repository: port, ref: 'feature' } }, { capture, env: process.env });
+    assert.deepEqual([own.commit, own.decomp, 'renderer' in own], [carries, pin, false]);
+    commit(port, 'feature', 'tools/ci/linux-build.sh', `DECOMP_REF=${pin}\nSMS_PORT_REF=nonsense\n`);
+    await assert.rejects(source.resolve({ port: { repository: port, ref: 'feature' } }, { capture, env: process.env }), /does not pin SMS_PORT_REF/);
+
     commit(port, 'feature', 'tools/ci/linux-build.sh', `DECOMP_REF=${pin}\nSMS_PORT_REF=${release.renderer.commit}\n`);
 
     // A connection GitHub drops is asked again; a repository that isn't there is not.

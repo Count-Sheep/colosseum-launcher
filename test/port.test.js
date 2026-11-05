@@ -138,15 +138,16 @@ test('the HD pack counts once its marker names the pinned pack', t => {
   assert.equal(port.texturePackInstalled(root), true);
 });
 
-test('a game folder holds the port and both repositories it builds from', t => {
+test('a game folder holds the port and the decomp it builds from', t => {
   const root = temporary(t);
   assert.equal(port.isPort(root), false);
-  for (const file of ['build.sh', 'run.sh', path.join('tools', 'befix.py'), path.join('deps', 'pkmn-colosseum', 'configure.py')]) {
+  for (const file of ['build.sh', 'run.sh', path.join('tools', 'befix.py')]) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), '');
   }
   assert.equal(port.isPort(root), false);
-  fs.mkdirSync(path.join(root, 'deps', 'sms-pc-port', 'src'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'deps', 'pkmn-colosseum'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'deps', 'pkmn-colosseum', 'configure.py'), '');
   assert.equal(port.isPort(root), true);
 });
 

@@ -24,7 +24,7 @@ function folder(t, prefix = 'colo game version-') {
 function fixture(t) {
   const root = folder(t);
   const { decomp, renderer } = port.dependencyPaths(root);
-  for (const [directory, commit] of [[root, source.commit], [decomp, source.decomp], [renderer, source.renderer.commit]]) {
+  for (const [directory, commit] of [[root, source.commit], [decomp, source.decomp], ...(source.renderer ? [[renderer, source.renderer.commit]] : [])]) {
     fs.mkdirSync(path.join(directory, '.git'), { recursive: true });
     fs.writeFileSync(path.join(directory, '.git', 'HEAD'), `${commit}\n`);
   }
@@ -162,7 +162,7 @@ test('each OS and Mac architecture has its tool version in a game\'s identity', 
     assert.equal(identity.platform, platform);
     assert.equal(identity.toolVersion, tools.toolsetFor(platform, arch));
     assert.equal(identity.toolSha256, tools.assetFor(platform, arch).sha256);
-    assert.equal(identity.renderer, source.renderer.commit);
+    assert.equal(identity.renderer, source.renderer?.commit ?? null);
   }
 });
 
@@ -214,6 +214,18 @@ test('the game folder is the port with the decomp and renderer inside it, each a
   // deps/ stays out of the port's own Git status
   assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(), '');
   assert.deepEqual(fs.readdirSync(home).filter(name => name.includes('.download-')), []);
+});
+
+test('a port that names no renderer is built from itself and the decomp, and nothing else is fetched', { skip: process.platform === 'win32' }, async t => {
+  const home = folder(t, 'colo checkout-');
+  const { renderer, ...pinned } = sourceFrom(home);
+  const root = path.join(home, 'Game Files');
+  await game.checkout(root, { ...runner(process.env), source: pinned });
+  assert.equal(port.isPort(root), true);
+  assert.equal(game.matchesSource(root, pinned), true);
+  assert.equal(fs.existsSync(path.join(root, 'deps', 'sms-pc-port')), false);
+  assert.equal(game.identity(undefined, undefined, pinned).renderer, null, 'stored as JSON, so it reads back the same');
+  assert.notEqual(game.snapshotPath(path.join(home, 'game'), pinned), game.snapshotPath(path.join(home, 'game'), { ...pinned, renderer }));
 });
 
 test('the launcher\'s patch is applied to the port it pins, and a changed patch means another build', { skip: process.platform === 'win32' }, async t => {
@@ -302,6 +314,7 @@ test('a download GitHub drops partway is tried again over HTTP/1.1, unless the p
 });
 
 test('this release pins every repository to a whole commit', () => {
-  for (const commit of [source.commit, source.decomp, source.renderer.commit, source.renderer.decomp]) assert.match(commit, /^[a-f0-9]{40}$/);
-  for (const url of [source.repository, source.decompRepository, source.renderer.repository, source.renderer.decompRepository]) assert.match(url, /^https:\/\//);
+  const { renderer } = source;
+  for (const commit of [source.commit, source.decomp, ...(renderer ? [renderer.commit, renderer.decomp] : [])]) assert.match(commit, /^[a-f0-9]{40}$/);
+  for (const url of [source.repository, source.decompRepository, ...(renderer ? [renderer.repository, renderer.decompRepository] : [])]) assert.match(url, /^https:\/\//);
 });
