@@ -1,6 +1,8 @@
 {
   "beta": {
-    "launcher": [],
+    "launcher": [
+      "New launcher background: a painted copper engine out in the desert."
+    ],
     "game": []
   },
   "releases": [
