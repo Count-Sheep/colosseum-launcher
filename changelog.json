@@ -1,16 +1,27 @@
 {
   "beta": {
-    "launcher": [
-      "New launcher background: a painted copper engine out in the desert.",
-      "Game updates and rebuilds are much faster: the launcher keeps what it compiled and reuses it. Free up space under Settings, Manage game clears it.",
-      "Import a Dolphin save: drop your North American .gci save on the Saves tab, or the folder it is in, and carry on from there. Your current saves are backed up first.",
-      "Join our Discord server: the Discord button at the top of the launcher opens the invite in your browser."
-    ],
-    "game": [
-      "The first build of the game is faster too."
-    ]
+    "launcher": [],
+    "game": []
   },
   "releases": [
+    {
+      "version": "0.1.1",
+      "date": "2026-11-05",
+      "launcher": [
+        "New launcher background: a painted copper engine out in the desert.",
+        "Game updates and rebuilds are much faster: the launcher keeps what it compiled and reuses it. Free up space under Settings, Manage game clears it.",
+        "Import a Dolphin save: drop your North American .gci save on the Saves tab, or the folder it is in, and carry on from there. Your current saves are backed up first.",
+        "Join our Discord server: the Discord button at the top of the launcher opens the invite in your browser."
+      ],
+      "game": {
+        "version": "2026.11.05.2",
+        "commit": "227d4325f5fd00c39d17a6912254c5f88148b442",
+        "changes": [
+          "The first build of the game is faster too.",
+          "Fixed the game stopping on macOS when you arrive in Phenac City with HD textures at the highest resolution."
+        ]
+      }
+    },
     {
       "version": "0.1.0",
       "date": "2026-11-05",
