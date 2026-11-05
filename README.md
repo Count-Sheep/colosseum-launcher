@@ -81,6 +81,10 @@ When a game update is ready, the main button becomes **Update & play**. Your cur
 
 Launcher updates download automatically when **Update automatically** is on and install when you quit. After an update, What's new opens once to show what changed.
 
+### Join the Beta
+
+Beta has the newest launcher and the newest game before they are released, and it is for testing, so it may break. Open **Settings → Launcher** and set **Launcher updates** to **Beta**. To leave, set it back to **Stable**. Portable launchers don't have this setting.
+
 ### Saved games and backups
 
 The launcher keeps your save location when you update or rebuild the game, and makes dated backups before and after playing, and before game updates or cleanup. The memory card is `colo-port/card-a` in your user data folder (`%APPDATA%` on Windows, `~/.local/share` elsewhere).
@@ -126,6 +130,8 @@ npm run dist -- --linux --x64     # or --win --x64, --mac --universal
 See [docs/build-tools.md](docs/build-tools.md).
 
 ### Versions and releases
+
+Every push to `main` also rebuilds the Beta (`refresh-beta.yml`, `build.yml`), which checks hourly for new commits on the port's branch. A pull request becomes a preview when **Build launcher** is run by hand with its number. **Game source** under Manage game builds from another port or decomp for testing.
 
 Pushing a higher `version` in `package.json` to `main` releases it: `release.yml` makes the tag and a draft, requires the pinned game to build everywhere (`game-build.yml`), packages all three systems and attaches the tool archives, then publishes.
 
