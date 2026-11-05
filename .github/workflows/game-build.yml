@@ -70,7 +70,23 @@ jobs:
       - name: Enable Intel execution on the Apple Silicon runner
         if: matrix.os == 'macos-15'
         run: sudo softwareupdate --install-rosetta --agree-to-license
+      # One archive per system, restored from the newest on main and saved by every run that isn't for a pull
+      # request, so pull requests read main's but can't fill the repository's 10 GB. The build goes through it as a
+      # player's does (src/compiler-cache.js): the folder has a space in its name, as players' often do.
+      - name: Restore build caches
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/Build Cache
+          key: build-cache-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: build-cache-${{ matrix.os }}-
       - name: Build and start the game with the private tools
         run: node scripts/smoke-build-tools.js
         env:
           COLO_SMOKE_SYSTEM32_DECOYS: ${{ runner.os == 'Windows' && '1' || '0' }}
+          COLO_COMPILER_CACHE_DIR: ${{ runner.temp }}/Build Cache
+      - name: Save build caches
+        if: (success() || failure()) && github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/Build Cache
+          key: build-cache-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}

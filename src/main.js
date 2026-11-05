@@ -7,6 +7,7 @@ const { spawn, execFile } = require('node:child_process');
 const port = require('./port');
 const saves = require('./saves');
 const buildTools = require('./build-tools');
+const compilerCache = require('./compiler-cache');
 const windowsDlls = require('./windows-dlls');
 const game = require('./game-version');
 const updateChannel = require('./update-channel');
@@ -584,16 +585,28 @@ async function build(forceFresh = false) {
   // A fresh build's folder is longer than the one ensureBuildTools checked.
   requireShortPaths(root);
   if (!port.hdVisualsInstalled(root, settings)) await installTextures(root);
-  const env = toolEnv({ ...process.env, NINJA_STATUS: '[%f/%t] ' });
-  const cmd = port.buildCommand(root, process.platform, env);
-  const result = await game.buildSafely(root, saveDirectory,
-    // A build that fails because antivirus deleted or blocked a tool says so instead of the compiler's error.
-    () => launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, 'Build Pokémon Colosseum')
-      .catch(error => {
-        const userData = app.getPath('userData');
-        throw hintedError(error) || buildTools.deletedToolsError(userData) || buildTools.blockedToolError(userData, error.output) || error;
-      }),
-    { source, toolFolder: toolsStatus().mode === 'own' ? null : buildTools.rootFor(app.getPath('userData')) });
+  const env = await withBuildCaches(toolEnv({ ...process.env, NINJA_STATUS: '[%f/%t] ' }), root);
+  const compile = buildEnv => {
+    const cmd = port.buildCommand(root, process.platform, buildEnv);
+    return game.buildSafely(root, saveDirectory,
+      // A build that fails because antivirus deleted or blocked a tool says so instead of the compiler's error.
+      () => launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, 'Build Pokémon Colosseum')
+        .catch(error => {
+          const userData = app.getPath('userData');
+          throw hintedError(error) || buildTools.deletedToolsError(userData) || buildTools.blockedToolError(userData, error.output) || error;
+        }),
+      { source, toolFolder: toolsStatus().mode === 'own' ? null : buildTools.rootFor(app.getPath('userData')) });
+  };
+  const startedAt = Date.now();
+  let result;
+  try { result = await compile(env); }
+  catch (error) {
+    // A failed build through the caches is tried once more without them, unless the player stopped it, the build
+    // tools lost files, or the drive is full or Windows won't let them fork (which fail the same way again).
+    if (!env.COLO_UNIT_CACHE || wasStopped(startedAt) || error.blockedTool || error.buildHint || buildTools.missingTools(app.getPath('userData'))?.length) throw error;
+    log('The build failed with the compiler cache. Building again without it…');
+    result = await compile(compilerCache.withoutCaches(env));
+  }
   // Preferences switch only after a successful build. Closing the app or a
   // failed download/build leaves the last installation selected and playable.
   const earlier = { ...config };
@@ -605,7 +618,20 @@ async function build(forceFresh = false) {
   log(`Game ${source.version} is ready. Your saved games stay in the same folder.`);
   await removeOldVersions();
   await removeOldBuildTools();
+  await compilerCache.trim(app.getPath('userData')).catch(error => log(`Could not trim the compiler cache: ${error.message}`));
   return result;
+}
+
+// What every game version's build shares (compiler-cache.js). A player's own COLO_UNIT_CACHE (empty for none) is used
+// instead. Without ccache the renderer compiles as before; the game's own units need nothing downloaded.
+async function withBuildCaches(env, root) {
+  if ('COLO_UNIT_CACHE' in process.env) return env;
+  const userData = app.getPath('userData');
+  try { return compilerCache.environment(env, await compilerCache.prepare(userData, { log }), { userData, root }); }
+  catch (error) {
+    log(`Building the renderer without the compiler cache: ${error.message}.`);
+    return compilerCache.environment(env, null, { userData, root });
+  }
 }
 
 async function removeOldBuildTools() {
@@ -763,6 +789,10 @@ async function clean(dryRun) {
   makeSaveBackup('before-cleanup');
   await fs.promises.rm(build, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   log('Removed the game\'s build. It builds again the next time you play.');
+  try {
+    await compilerCache.clear(app.getPath('userData'));
+    log('Removed the compiler cache.');
+  } catch (error) { log(`Could not remove the compiler cache: ${error.message}`); }
   await removeOldVersions();
   await removeOldBuildTools();
   return { ok: true };

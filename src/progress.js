@@ -32,6 +32,7 @@ function activityFromLine(line) {
   const output = value.replace(/^\[\s*(?:\d{1,3}%|\d+\s*\/\s*\d+)\]\s*/, '');
   // These run after compilation. Their command may print 100% before copying
   // the disc, so keep this separate phase indeterminate until the process exits.
+  if (value === 'mirror: reused') return { detail: "Reusing the game's prepared source", percent: null };
   if (/^game objs \d+/.test(value) || /^linked /.test(value) || /^ninja: no work to do\./.test(value))
     return { detail: 'Finishing setup', percent: null };
   if (value === "Preparing the decomp's build") return { detail: "Preparing the game's source", percent: null };

@@ -1,7 +1,11 @@
 {
   "beta": {
-    "launcher": [],
-    "game": []
+    "launcher": [
+      "Game updates and rebuilds are much faster: the launcher keeps what it compiled and reuses it. Free up space under Settings, Manage game clears it."
+    ],
+    "game": [
+      "The first build of the game is faster too."
+    ]
   },
   "releases": [
     {
