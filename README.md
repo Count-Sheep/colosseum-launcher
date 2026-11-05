@@ -1,5 +1,8 @@
 # Colosseum Launcher
 
+<img width="1512" height="943" alt="image" src="https://github.com/user-attachments/assets/a513d488-33c6-4249-9792-5fb9c79a0b1b" />
+
+
 Set up and play the native PC port of Pokémon Colosseum on **Windows, macOS, and Linux**. The launcher guides you through setup, downloads the tools it needs, and gives you one big **Play** button when you're ready.
 
 **Bring your own game.** You need a disc image made from your own North American Pokémon Colosseum disc. The launcher does not include a game or disc image.
