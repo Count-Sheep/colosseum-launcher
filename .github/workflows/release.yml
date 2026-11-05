@@ -10,9 +10,14 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
     outputs:
       release: ${{ steps.version.outputs.release }}
       tag: ${{ steps.version.outputs.tag }}
+      game-built: ${{ steps.prior.outputs.game-built }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,6 +31,13 @@ jobs:
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Look for the game build of the merged pull request
+        id: prior
+        if: steps.version.outputs.release == 'true'
+        run: node scripts/prior-game-build.js
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
       - name: Create tag and draft release
         if: steps.version.outputs.release == 'true'
         env:
@@ -38,17 +50,19 @@ jobs:
             git push origin "$TAG"
           fi
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --draft --title "$TAG" --generate-notes
-  # The release gate: the game this release pins must build everywhere first.
+  # The release gate: the game this release pins must build everywhere first. The merged pull request's own build
+  # counts when it passed on every system with exactly these files (scripts/prior-game-build.js).
   verify-game:
     needs: prepare
-    if: needs.prepare.outputs.release == 'true'
+    if: needs.prepare.outputs.release == 'true' && needs.prepare.outputs.game-built != 'true'
     uses: ./.github/workflows/game-build.yml
     with:
       launcher-ref: ${{ needs.prepare.outputs.tag }}
     permissions:
       contents: read
+  # Packages into the draft alongside the gate: nothing is public until finalize, which waits for both.
   publish:
-    needs: [prepare, verify-game]
+    needs: prepare
     if: needs.prepare.outputs.release == 'true'
     strategy:
       fail-fast: false
@@ -101,7 +115,9 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
   finalize:
     needs: [prepare, verify-game, publish]
-    if: needs.prepare.outputs.release == 'true'
+    if: >-
+      always() && needs.prepare.outputs.release == 'true' && needs.publish.result == 'success' &&
+      (needs.verify-game.result == 'success' || needs.prepare.outputs.game-built == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Publish complete release
