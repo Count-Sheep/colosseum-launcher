@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://discord.gg/pkVwBrSwsZ"><img src="https://invidget.switchblade.xyz/pkVwBrSwsZ" alt="Join the Pokémon Colosseum Port Discord server"></a>
+  <a href="https://discord.gg/pkVwBrSwsZ"><img src="docs/discord-card.svg" alt="Join the Pokémon Colosseum Port Discord server"></a>
   <br>
   <a href="https://discord.gg/pkVwBrSwsZ"><img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
 </p>
