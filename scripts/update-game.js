@@ -12,6 +12,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const current = require('../src/game-release.json');
 const { pinned, rendererHeaders } = require('./game-pins');
+const { OLDER_RENDERER, rendererPin } = require('../src/game-source');
 const ref = process.argv[2] || `origin/${current.branch}`;
 const launcherRoot = path.join(__dirname, '..');
 const previousLauncher = require('../package.json').version;
@@ -42,21 +43,22 @@ try {
   const commit = git(['rev-parse', '--verify', `${ref}^{commit}`]);
   const script = git(['show', `${commit}:tools/ci/linux-build.sh`]);
   const decomp = pinned(script, 'DECOMP_REF');
-  const renderer = pinned(script, 'SMS_PORT_REF');
-  if (commit === current.commit && decomp === current.decomp && renderer === current.renderer.commit) {
+  const renderer = rendererPin(script);
+  if (commit === current.commit && decomp === current.decomp && renderer === current.renderer?.commit) {
     console.log('This game revision is already selected. No release bump needed.');
   } else {
-    const headers = rendererHeaders(current.renderer.repository, renderer);
+    const headers = renderer ? rendererHeaders(OLDER_RENDERER.repository, renderer) : null;
     const date = new Date().toISOString().slice(0, 10).replaceAll('-', '.');
     const number = current.version.startsWith(`${date}.`) ? Number(current.version.split('.').at(-1)) + 1 : 1;
-    const next = { ...current, version: `${date}.${number}`, commit, decomp,
-      renderer: { ...current.renderer, commit: renderer, decomp: headers.decomp, decompRepository: headers.decompRepository || current.renderer.decompRepository } };
+    const { renderer: _, ...rest } = current;
+    const next = { ...rest, version: `${date}.${number}`, commit, decomp, ...(renderer && {
+      renderer: { ...OLDER_RENDERER, commit: renderer, decomp: headers.decomp, decompRepository: headers.decompRepository || OLDER_RENDERER.decompRepository } }) };
     fs.writeFileSync(path.join(launcherRoot, 'src', 'game-release.json'), `${JSON.stringify(next, null, 2)}\n`);
     execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['version', 'patch', '--no-git-tag-version'],
       { cwd: launcherRoot, stdio: 'inherit', shell: process.platform === 'win32' });
     const version = JSON.parse(fs.readFileSync(path.join(launcherRoot, 'package.json'), 'utf8')).version;
     addChangelogEntry(version, next, current.commit);
-    console.log(`Selected game ${next.version}: ${commit} (decomp ${decomp}, renderer ${renderer}).`);
+    console.log(`Selected game ${next.version}: ${commit} (decomp ${decomp}${renderer ? `, renderer ${renderer}` : ''}).`);
     console.log(`Drafted changelog.json notes for v${version} from commit subjects. Edit them for players, then commit and push to main.`);
   }
 } finally { fs.rmSync(root, { recursive: true, force: true }); }

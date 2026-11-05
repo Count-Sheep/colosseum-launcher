@@ -119,7 +119,7 @@ function savedGameSource(saved) {
     const override = gameSource.normalizeOverride(saved?.override);
     const resolved = saved?.resolved;
     if (!override || !/^[a-f0-9]{40}$/.test(resolved?.commit) || !/^[a-f0-9]{40}$/.test(resolved?.decomp) ||
-      !/^[a-f0-9]{40}$/.test(resolved?.renderer?.commit)) return null;
+      (resolved?.renderer && !/^[a-f0-9]{40}$/.test(resolved.renderer.commit))) return null;
     return { override, resolved: { ...resolved, custom: true, override } };
   } catch (_) { return null; }
 }

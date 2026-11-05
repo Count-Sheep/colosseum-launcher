@@ -83,7 +83,7 @@ jobs:
             [ "$REF" = refs/heads/main ] || { echo "::error::Run Beta from main."; exit 1; }
             out preview true; out channel beta; out suffix beta; out sha "$SHA"
             # Beta plays the newest game, not the commit main pins for the next Stable release:
-            # the port's branch, and the decomp and renderer its newest commit names.
+            # the port's branch, and the decomp (and any renderer) its newest commit names.
             node scripts/game-pins.js
             game=$(sed -n 's/^commit=//p' "$GITHUB_OUTPUT" | tail -1)
             out game "$game"; out game_version "$(date -u +%Y.%m.%d)-beta.${game:0:7}"
@@ -149,7 +149,8 @@ jobs:
               const file = "src/game-release.json";
               const game = JSON.parse(fs.readFileSync(file, "utf8"));
               Object.assign(game, { version: GAME_VERSION, commit: GAME, decomp: DECOMP });
-              Object.assign(game.renderer, { commit: RENDERER, decomp: RENDERER_DECOMP });
+              if (RENDERER) Object.assign(game.renderer, { commit: RENDERER, decomp: RENDERER_DECOMP });
+              else delete game.renderer;
               fs.writeFileSync(file, JSON.stringify(game, null, 2) + "\n");
               console.log(`Game ${game.version}: ${GAME}`);
             }'

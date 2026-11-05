@@ -2,13 +2,17 @@
 
 // A game source other than this launcher release's: another port fork or commit, another decomp fork or commit,
 // or both. Branches and tags are resolved to commits when chosen (and again by Update game), so each build knows
-// exactly what it is made from. The renderer follows the port: it names the commit it builds with.
+// exactly what it is made from. The renderer follows the port: an older port names the commit it builds with, and a
+// newer one has what it needs in its own tree and names none.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const release = require('./game-release.json');
 const { retrying, GIT_PERMANENT } = require('./retry');
+
+// Where an older port's renderer comes from. A release of such a port names these too (game-release.json).
+const OLDER_RENDERER = { repository: 'https://github.com/chasem-dev/sms-pc-port.git', decompRepository: 'https://github.com/chasem-dev/sms-english.git' };
 
 const SHA = /^[a-f0-9]{40}$/;
 const REF = /^[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}$/;
@@ -72,12 +76,15 @@ function pinned(script, name) {
   return value;
 }
 
+// The renderer commit a port commit builds with, if it names one.
+function rendererPin(script) { return /^SMS_PORT_REF=/m.test(script) ? pinned(script, 'SMS_PORT_REF') : undefined; }
+
 // The decomp and renderer commits a port commit builds with.
 function pinsAt(repository, commit, tools) {
   return inTemporaryRepository(tools, async directory => {
     await tools.remote(['fetch', '-q', '--depth', '1', repository, commit], directory);
     const script = await tools.capture(tools.git, ['show', `${commit}:tools/ci/linux-build.sh`], directory, tools.env);
-    return { decomp: pinned(script, 'DECOMP_REF'), renderer: pinned(script, 'SMS_PORT_REF') };
+    return { decomp: pinned(script, 'DECOMP_REF'), renderer: rendererPin(script) };
   });
 }
 
@@ -102,16 +109,17 @@ async function resolve(override, { git = 'git', capture, env, wait }) {
     { wait, permanent: error => GIT_PERMANENT.test(error.message) });
   const port = override.port ? { repository: override.port.repository, ...await resolveRef(override.port, tools) }
     : { repository: release.repository, branch: release.branch, commit: release.commit };
-  const pins = override.port ? await pinsAt(port.repository, port.commit, tools) : { decomp: release.decomp, renderer: release.renderer.commit };
+  const pins = override.port ? await pinsAt(port.repository, port.commit, tools) : { decomp: release.decomp, renderer: release.renderer?.commit };
   const decomp = override.decomp ? (await resolveRef(override.decomp, tools)).commit : pins.decomp;
-  const renderer = pins.renderer === release.renderer.commit ? release.renderer
-    : { ...release.renderer, commit: pins.renderer, decomp: await rendererHeaders(release.renderer.repository, pins.renderer, tools) };
+  const renderer = !pins.renderer ? null : pins.renderer === release.renderer?.commit ? release.renderer
+    : { ...OLDER_RENDERER, commit: pins.renderer, decomp: await rendererHeaders(OLDER_RENDERER.repository, pins.renderer, tools) };
   return { custom: true, version: label(port.commit, override.decomp ? decomp : null), repository: port.repository, branch: port.branch,
-    commit: port.commit, portPatch: release.portPatch, decompRepository: override.decomp?.repository || release.decompRepository, decomp, renderer, override };
+    commit: port.commit, portPatch: release.portPatch, decompRepository: override.decomp?.repository || release.decompRepository, decomp,
+    ...(renderer && { renderer }), override };
 }
 
 function label(commit, decomp) {
   return `custom ${commit.slice(0, 7)}${decomp ? ` + decomp ${decomp.slice(0, 7)}` : ''}`;
 }
 
-module.exports = { normalizeOverride, pickRef, resolve };
+module.exports = { OLDER_RENDERER, rendererPin, normalizeOverride, pickRef, resolve };

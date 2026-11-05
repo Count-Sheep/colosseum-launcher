@@ -21,14 +21,14 @@ function platformInfo(platform = process.platform) {
   throw new Error(`This port does not support ${platform}.`);
 }
 
-// What the game checkout holds beside the port: the decomp it compiles and the renderer's sources.
+// What the game checkout holds beside the port: the decomp it compiles and, for an older port, the renderer's sources.
 function dependencyPaths(root) {
   return { decomp: path.join(root, 'deps', 'pkmn-colosseum'), renderer: path.join(root, 'deps', 'sms-pc-port') };
 }
 
 function isPort(root) {
-  return Boolean(root && ['build.sh', 'run.sh', path.join('tools', 'befix.py'), path.join('deps', 'pkmn-colosseum', 'configure.py'),
-    path.join('deps', 'sms-pc-port', 'src')].every(file => fs.existsSync(path.join(root, file))));
+  return Boolean(root && ['build.sh', 'run.sh', path.join('tools', 'befix.py'), path.join('deps', 'pkmn-colosseum', 'configure.py')]
+    .every(file => fs.existsSync(path.join(root, file))));
 }
 
 const OWN_DISC = 'Choose a copy of your own North American Pokémon Colosseum disc (GC6E01) as an ISO or GCM file.';
