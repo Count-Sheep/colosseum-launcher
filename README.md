@@ -152,7 +152,7 @@ Every push to `main` also rebuilds the Beta (`refresh-beta.yml`, `build.yml`), w
 
 Each published Beta is announced in Discord when the `DISCORD_BETA_WEBHOOK` repository secret holds a channel webhook URL (in Discord: the channel's **Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL**, then `gh secret set DISCORD_BETA_WEBHOOK`). The message has the launcher and game versions, links to the release and both commits, and the notes added to Beta in `changelog.json` since the last Beta (all of them if the last Beta's notes can't be read). Without the secret, or if Discord is unreachable, Beta still publishes.
 
-Pushing a higher `version` in `package.json` to `main` releases it: `release.yml` makes the tag and a draft, requires the pinned game to build everywhere (`game-build.yml`), packages all three systems and attaches the tool archives, then publishes.
+Pushing a higher `version` in `package.json` to `main` releases it: `release.yml` makes the tag and a draft, packages all three systems and attaches the tool archives while it requires the pinned game to build everywhere (`game-build.yml`), then publishes. That build is skipped when the pull request merged for the release already passed it on every system with exactly the same files, so let its checks finish before merging for a faster release.
 
 `npm run update:game` selects the newest commit of the port's branch and the decomp and renderer commits it pins, bumps the version and drafts the changelog. See [AGENTS.md](AGENTS.md) for the changelog's rules.
 

@@ -6,7 +6,8 @@ name: Game build
 # the toolsets or a repository the game builds from shows up.
 # A pull request or Beta skips the build on a system where these exact inputs already built and started: the game's
 # pins, the tools, the launcher code that builds it and this workflow. Beta's game version names the day, so Beta
-# still builds on each system once a day. Weekly runs and releases always build, and record what passed.
+# still builds on each system once a day. Weekly runs always build, and record what passed. A release builds too,
+# unless the pull request merged for it passed here with exactly the same files (scripts/prior-game-build.js).
 on:
   pull_request:
   schedule:
