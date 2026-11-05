@@ -1,0 +1,77 @@
+name: Refresh Beta
+# Keeps the Beta channel on the newest launcher main and the newest game.
+#   - every push to main rebuilds Beta;
+#   - every hour, Beta is rebuilt if main has commits that change the packaged
+#     launcher, or the game's branch has commits that change the game (not docs,
+#     tests or workflows alone in either; put [skip ci] in a launcher commit
+#     message to skip the push build);
+#   - Actions > Refresh Beta > Run workflow rebuilds it right away.
+# The build itself is build.yml with "beta".
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+# One Beta build at a time. A push to main (merges are linear, so the newest
+# commit has everything) or a manual run cancels the build in progress. The
+# hourly check never cancels: it waits, replacing any older waiting run.
+concurrency:
+  group: refresh-beta
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.check.outputs.stale }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" != schedule ]; then echo stale=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          pinned=$(gh api "repos/$GH_REPO/contents/src/game-release.json?ref=$SHA" -H 'Accept: application/vnd.github.raw')
+          game=$(git ls-remote "$(jq -r .repository <<<"$pinned")" "refs/heads/$(jq -r .branch <<<"$pinned")" | cut -f1)
+          built=$(gh release view beta --json body --jq .body 2>/dev/null | grep -o '<!-- beta launcher=[0-9a-f]* game=[0-9a-f]* -->' || true)
+          built_launcher=$(sed -n 's/.*launcher=\([0-9a-f]*\) .*/\1/p' <<<"$built")
+          built_game=$(sed -n 's/.*game=\([0-9a-f]*\) .*/\1/p' <<<"$built")
+          # The files commits since Beta's build changed: changed <base> <head> <repository>.
+          # A list GitHub cuts short (300 files), or none at all, counts as a change to everything.
+          changed() {
+            gh api "repos/$3/compare/$1...$2" --jq 'if (.files | length) >= 300 then "(300 files or more)" else .files[].filename end' ||
+              echo "(could not compare)"
+          }
+          # What goes into the packaged launcher (package.json "build").
+          # Commits that change nothing players get leave Beta as it is.
+          packaged='^(src/|build/|package(-lock)?\.json$|changelog\.json$|scripts/(build-colosseum\.sh|install-textures\.py|port-launcher\.patch)$)'
+          stale=false
+          if [ -z "$built_launcher" ] || [ -z "$built_game" ]; then
+            echo "Beta's release names no launcher and game commit."; stale=true
+          fi
+          if [ "$stale" = false ] && [ "$built_launcher" != "$SHA" ]; then
+            files=$(changed "$built_launcher" "$SHA" "$GH_REPO")
+            echo "Launcher files changed since Beta's ${built_launcher:0:7}:"; echo "$files"
+            if grep -qE "$packaged" <<<"$files" || grep -q '^(' <<<"$files"; then stale=true; fi
+          fi
+          # The port is on GitLab, so any commit to its branch counts.
+          if [ "$stale" = false ] && [ "$built_game" != "$game" ]; then
+            echo "The game's branch moved from ${built_game:0:7}."; stale=true
+          fi
+          if [ "$stale" = true ]; then echo "Beta is out of date; rebuilding with game ${game:0:7}."
+          else echo "Beta (launcher ${built_launcher:0:7}, game ${built_game:0:7}) already has what players would get from launcher ${SHA:0:7} with game ${game:0:7}."; fi
+          echo "stale=$stale" >> "$GITHUB_OUTPUT"
+  build:
+    needs: check
+    if: needs.check.outputs.stale == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      beta: true
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write

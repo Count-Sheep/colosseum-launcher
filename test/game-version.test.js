@@ -152,7 +152,7 @@ test('the first install goes once updates replaced it, only if the launcher down
 test('game folders are named by a short commit and a hash of the rest, to keep Windows paths short', () => {
   const name = path.basename(game.snapshotPath('/game'));
   assert.match(name, new RegExp(`^${source.commit.slice(0, 7)}-[a-f0-9]{4}$`));
-  assert.equal(path.dirname(game.snapshotPath('/game')), '/game.releases');
+  assert.equal(path.dirname(game.snapshotPath('/game')), path.normalize('/game.releases'));
   assert.notEqual(game.snapshotPath('/game'), game.snapshotPath('/game', { ...source, decomp: 'b'.repeat(40) }));
 });
 

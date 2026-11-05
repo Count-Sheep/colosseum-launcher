@@ -1,0 +1,76 @@
+name: Game build
+# Builds the game the way the launcher does for players, with its private toolsets: Linux, Windows, and
+# Intel and Apple Silicon Macs (the game is x86_64 on both; Rosetta 2 runs it on Apple Silicon). Each build
+# starts the game far enough to reach its disc check. No disc image is used and no game binary is published.
+# It runs for pull requests, before every release (release.yml) and Beta (build.yml), and weekly, so a change to GitHub's runners,
+# the toolsets or a repository the game builds from shows up.
+on:
+  pull_request:
+  schedule:
+    - cron: '17 8 * * 1'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      launcher-ref:
+        description: Launcher branch, tag or commit whose build tools build the game
+        type: string
+        default: ''
+      game-commit:
+        description: Game commit to build instead of src/game-release.json's
+        type: string
+        default: ''
+      game-decomp:
+        description: The decomp commit game-commit uses
+        type: string
+        default: ''
+      game-renderer:
+        description: The renderer commit game-commit uses
+        type: string
+        default: ''
+      game-renderer-decomp:
+        description: The commit of the renderer's headers
+        type: string
+        default: ''
+      game-version:
+        type: string
+        default: ci
+permissions:
+  contents: read
+concurrency:
+  group: game-build-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  compile-port:
+    name: compile-port (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15-intel, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.launcher-ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Point the launcher at the game commit to build
+        if: inputs.game-commit != ''
+        shell: bash
+        env:
+          COMMIT: ${{ inputs.game-commit }}
+          DECOMP: ${{ inputs.game-decomp }}
+          RENDERER: ${{ inputs.game-renderer }}
+          RENDERER_DECOMP: ${{ inputs.game-renderer-decomp }}
+          VERSION: ${{ inputs.game-version }}
+        run: node scripts/pin-game.js
+      - name: Enable Intel execution on the Apple Silicon runner
+        if: matrix.os == 'macos-15'
+        run: sudo softwareupdate --install-rosetta --agree-to-license
+      - name: Build and start the game with the private tools
+        run: node scripts/smoke-build-tools.js
+        env:
+          COLO_SMOKE_SYSTEM32_DECOYS: ${{ runner.os == 'Windows' && '1' || '0' }}

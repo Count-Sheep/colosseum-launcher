@@ -54,8 +54,9 @@ test('the tools name zig\'s clang, quoted for a path with spaces, on every syste
   fs.mkdirSync(path.join(root, 'env', 'bin'), { recursive: true });
   fs.mkdirSync(path.join(root, 'msys64'));
   const linux = tools.environmentAtRoot(root, { PATH: '/usr/bin' }, 'linux');
-  assert.equal(linux.COLO_CLANG, `"${path.join(root, 'env', 'zig', 'zig')}" clang`);
-  assert.equal(linux.COLO_CLANG_INC, `${path.join(root, 'env', 'zig')}/lib/include`);
+  const forward = file => file.replaceAll('\\', '/');   // what the launcher hands the port, on every system
+  assert.equal(linux.COLO_CLANG, `"${forward(path.join(root, 'env', 'zig', 'zig'))}" clang`);
+  assert.equal(linux.COLO_CLANG_INC, `${forward(path.join(root, 'env', 'zig'))}/lib/include`);
   assert.equal(linux.COLO_SDL_INC, path.join(root, 'env', 'include', 'SDL2'));
   assert.equal(linux.CPATH, path.join(root, 'env', 'include'));
   assert.equal(linux.LIBRARY_PATH, path.join(root, 'env', 'lib'));

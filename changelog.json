@@ -3,5 +3,24 @@
     "launcher": [],
     "game": []
   },
-  "releases": []
+  "releases": [
+    {
+      "version": "0.1.0",
+      "date": "2026-11-05",
+      "launcher": [
+        "First release: set up and play the Pokémon Colosseum PC port from your own North American disc on Windows, macOS and Linux.",
+        "Three-step setup downloads everything it needs and builds the game on your computer. The disc image never leaves it.",
+        "HD textures: all 7,498 of the game's textures upscaled 4×, on by default. Turn them off under Settings, Graphics.",
+        "Settings for the screen format, frame rate, picture sharpness, controls, rumble and GameCube controller adapters.",
+        "Your saves are backed up before and after you play. Restore one from the Saves tab."
+      ],
+      "game": {
+        "version": "2026.11.05.1",
+        "commit": "e8ba5baae586bb43b9e4e60e8a73e5a303bb7d83",
+        "changes": [
+          "Native PC port with movies, music and sound, HD text, widescreen, 60 fps and Vulkan or OpenGL rendering."
+        ]
+      }
+    }
+  ]
 }
