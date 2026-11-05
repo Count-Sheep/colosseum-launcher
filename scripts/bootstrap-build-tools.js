@@ -17,18 +17,19 @@ const MAC_MAMBA = {
 };
 const MAC_PACKAGES = ['python=3.12', 'git=2.55', 'cmake=4.4.3', 'ninja', 'make', 'patch', 'rsync',
   'llvm-tools-21=21.1.8', 'lld=21.1.8', 'bash', 'coreutils', 'grep', 'sed', 'gawk', 'findutils', 'curl'];
-// zig's clang compiles the game code, at the release the port builds with on each system
-// (its tools/env.sh and tools/ci/linux-build.sh; tools/befix.py reads the IR it writes).
+// zig's clang compiles the game code on Linux and macOS, at the release the port builds with
+// on each system (its tools/env.sh and tools/ci/linux-build.sh; tools/befix.py reads the IR it writes).
 const ZIG = {
   linux: { url: 'https://ziglang.org/download/0.17.0/zig-x86_64-linux-0.17.0.tar.xz',
     sha256: '1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026' },
-  win32: { url: 'https://ziglang.org/download/0.14.1/zig-x86_64-windows-0.14.1.zip',
-    sha256: '554f5378228923ffd558eac35e21af020c73789d87afeabf4bfd16f2e6feed2c' },
   'darwin-x64': { url: 'https://ziglang.org/download/0.14.1/zig-x86_64-macos-0.14.1.tar.xz',
     sha256: 'b0f8bdfb9035783db58dd6c19d7dea89892acc3814421853e5752fe4573e5f43' },
   'darwin-arm64': { url: 'https://ziglang.org/download/0.14.1/zig-aarch64-macos-0.14.1.tar.xz',
     sha256: '39f3dc5e79c22088ce878edc821dedb4ca5a1cd9f5ef915e9b3cc3053e8faefa' }
 };
+// On Windows it is llvm-mingw's clang 19, the same release as tools/env.sh: zig.exe needs Windows 8 or later.
+const LLVM_MINGW = { url: 'https://github.com/mstorsjo/llvm-mingw/releases/download/20250114/llvm-mingw-20250114-msvcrt-x86_64.zip',
+  sha256: 'f63f9657ec5642f456e1788d9083b530d0424dcad7a9a96d92208f2eb98cbf33', llvm: '19.1.7' };
 const MSYS2 = {
   url: 'https://github.com/msys2/msys2-installer/releases/download/2026-09-27/msys2-base-x86_64-20260927.sfx.exe',
   sha256: 'ad336cccfda47758b5e15cda993fbba421115cb0b126697daef1ee4dfe37209f'
@@ -44,16 +45,15 @@ const WINDOWS_PACKAGES = [
   'mingw-w64-x86_64-ninja', 'mingw-w64-x86_64-python', 'patch', 'git', 'rsync'
 ];
 
-// The zig release for this computer, unpacked into `folder` (<folder>/zig, <folder>/lib ...).
-async function installZig(root, folder, platform, run, progress, tar) {
-  const source = ZIG[platform === 'darwin' ? `darwin-${process.arch}` : platform];
+// A compiler's release, unpacked into `folder` (its one top folder's contents).
+async function installCompiler(root, folder, source, run, progress, tar) {
   const archive = path.join(root, path.basename(source.url));
   await ensureArchive(archive, source, progress);
   const staging = `${folder}.unpack`;
   fs.rmSync(staging, { recursive: true, force: true });
   fs.rmSync(folder, { recursive: true, force: true });
   fs.mkdirSync(staging, { recursive: true });
-  await run(tar, ['-xf', archive, '-C', staging], {}, 'Unpack zig');
+  await run(tar, ['-xf', archive, '-C', staging], {}, 'Unpack compiler');
   const [top] = fs.readdirSync(staging);
   fs.renameSync(path.join(staging, top), folder);
   fs.rmSync(staging, { recursive: true, force: true });
@@ -105,7 +105,7 @@ async function prepareFromUpstream(userData, { platform = process.platform, run,
       fs.rmSync(link, { force: true });
       fs.symlinkSync(target, link);
     }
-    await installZig(root, path.join(prefix, 'zig'), platform, run, progress, 'tar');
+    await installCompiler(root, path.join(prefix, 'zig'), ZIG[platform === 'darwin' ? `darwin-${process.arch}` : platform], run, progress, 'tar');
     const required = platform === 'darwin' ? ['git', 'cmake', 'ninja', 'make', 'patch', 'rsync', 'python3', 'llvm-objcopy', 'llvm-nm', 'ld.lld', 'clang++', 'bash']
       : ['git', 'cmake', 'ninja', 'make', 'patch', 'rsync', 'python3', 'objcopy', 'nm', 'g++', 'bash'];
     for (const name of required)
@@ -138,11 +138,15 @@ async function prepareFromUpstream(userData, { platform = process.platform, run,
         fs.copyFileSync(certificates, file);
       }
     // Windows' own tar reads the zip; MSYS2's would not.
-    await installZig(root, path.join(msys, 'zig'), platform, run, progress, path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'));
+    const llvm = path.join(msys, 'llvm-mingw');
+    await installCompiler(root, llvm, LLVM_MINGW, run, progress, path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'));
+    // The game needs the compiler and its headers, not the rest of this cross toolchain.
+    for (const name of fs.readdirSync(llvm)) if (!['bin', 'lib', 'LICENSE.TXT'].includes(name)) fs.rmSync(path.join(llvm, name), { recursive: true, force: true });
+    for (const name of fs.readdirSync(path.join(llvm, 'lib'))) if (name !== 'clang') fs.rmSync(path.join(llvm, 'lib', name), { recursive: true, force: true });
   }
   fs.writeFileSync(path.join(root, 'ready.json'), JSON.stringify({ toolset: toolsetFor(platform), platform }), { mode: 0o600 });
   return status(userData, platform);
 }
 
 
-module.exports = { prepareFromUpstream, ZIG };
+module.exports = { prepareFromUpstream, ZIG, LLVM_MINGW };

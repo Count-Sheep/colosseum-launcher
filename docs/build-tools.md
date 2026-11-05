@@ -2,10 +2,10 @@
 
 The launcher and its toolsets have independent versions. `src/tool-assets.json` and `src/mac-tool-assets.json` pin each archive's URL and SHA-256 checksum. Linux x64, Windows x64, and Mac x64/arm64 computers download their matching archive automatically in setup Step 1. These are prepared in a disposable publisher job, never by installing packages on a player's system.
 
-What the port builds with, on every system: zig's clang (the game code, at the release the port uses on that system: 0.17.0 on Linux, 0.14.1 on Windows and macOS; `tools/befix.py` reads the IR it writes), a C/C++ compiler for the host code and renderer, CMake, Ninja, Python 3, Git, rsync, and SDL2.
+What the port builds with, on every system: a pinned clang for the game code (zig's on Linux and macOS, at the release the port uses there: 0.17.0 on Linux, 0.14.1 on macOS; llvm-mingw 20250114's clang 19 on Windows, as `zig.exe` needs Windows 8 or later; `tools/befix.py` reads the IR it writes), a C/C++ compiler for the host code and renderer, CMake, Ninja, Python 3, Git, rsync, and SDL2.
 
 - **Linux:** conda-forge packages with GCC against a glibc 2.17 sysroot, so the game runs on every distribution the launcher does. The game finds SDL2 and EGL in the tools through its RPATH.
-- **Windows:** a private MSYS2 with MINGW64 GCC. The game links SDL2 and the runtimes in, so it plays without the tools once built.
+- **Windows:** a private MSYS2 with MINGW64 GCC, and llvm-mingw's clang 19 in its `llvm-mingw` folder. The game links SDL2 and the runtimes in, so it plays without the tools once built.
 - **macOS:** conda-forge packages with LLVM's object tools and `ld.lld`, which link the game's ELF objects into the image the executable carries. Small `clang`/`clang++` wrappers select Apple's compiler; Apple's SDK, Command Line Tools and Rosetta stay out of our archives, and the port fetches SDL2.framework and MoltenVK when it builds. Homebrew is not required.
 
 ## macOS setup

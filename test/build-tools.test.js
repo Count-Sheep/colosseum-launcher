@@ -48,7 +48,7 @@ test('Linux private Make builds a nested CMake project when the tools path conta
   assert.ok(fs.existsSync(path.join(build, 'child', 'passed')));
 });
 
-test('the tools name zig\'s clang, quoted for a path with spaces, on every system', t => {
+test('the tools name the game\'s clang, quoted for a path with spaces, on every system', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'colo tools zig-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'env', 'bin'), { recursive: true });
@@ -61,7 +61,8 @@ test('the tools name zig\'s clang, quoted for a path with spaces, on every syste
   assert.equal(linux.CPATH, path.join(root, 'env', 'include'));
   assert.equal(linux.LIBRARY_PATH, path.join(root, 'env', 'lib'));
   const windows = tools.environmentAtRoot(root, { Path: 'C:\\WINDOWS' }, 'win32');
-  assert.match(windows.COLO_CLANG, /^".*zig\/zig\.exe" clang$/);
+  assert.match(windows.COLO_CLANG, /^".*llvm-mingw\/bin\/clang-19\.exe"$/);
+  assert.match(windows.COLO_CLANG_INC, /llvm-mingw\/lib\/clang\/19\/include$/);
   assert.equal(windows.COLO_CLANG.includes('\\'), false);
   const mac = tools.environmentAtRoot(root, { PATH: '/usr/bin' }, 'darwin');
   assert.equal(mac.COLO_LLD, path.join(root, 'env', 'bin', 'ld.lld'));
@@ -234,10 +235,10 @@ test('an explicit COLO_MSYS2_ROOT replaces the bundled Windows tools without dow
   assert.equal(env.MSYS2_ROOT, own);
   assert.equal(env.MSYSTEM, 'MINGW64');
   assert.ok(env.PATH.startsWith(`${path.join(own, 'mingw64', 'bin')};${path.join(own, 'usr', 'bin')};`));
-  // Their MSYS2 has no zig: the port downloads its own, or uses the clang they name.
+  // Their MSYS2 has no compiler for the game: the port downloads its own, or uses the clang they name.
   assert.equal('COLO_CLANG' in env, false);
   assert.equal('COLO_CLANG_INC' in env, false);
-  const clang = { COLO_CLANG: '"C:/zig/zig.exe" clang', COLO_CLANG_INC: 'C:/zig/lib/include' };
+  const clang = { COLO_CLANG: '"C:/llvm/bin/clang-19.exe"', COLO_CLANG_INC: 'C:/llvm/lib/clang/19/include' };
   assert.deepEqual((({ COLO_CLANG, COLO_CLANG_INC }) => ({ COLO_CLANG, COLO_CLANG_INC }))(
     tools.environment(userData, { PATH: 'system', COLO_MSYS2_ROOT: own, ...clang }, 'win32')), clang);
   // Play's recorded toolset still yields to the player's choice.
