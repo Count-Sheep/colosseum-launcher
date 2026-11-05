@@ -70,7 +70,7 @@ async function main() {
     source.toolset ||= generated.toolset;
     require(platform === 'darwin' ? '../src/mac-tool-assets.json' : '../src/tool-assets.json').platforms[key] = source;
   }
-  const archiveFile = source ? path.join(path.dirname(manifestFile), source.name) : null;
+  const archiveFile = source ? path.resolve(path.dirname(manifestFile), source.name) : null;
   await buildTools.prepare(userData, { forcePrivate: true, run, source, archiveFile,
     progress(percent, detail) {
       if (detail) process.stdout.write(`${detail}\n`);
