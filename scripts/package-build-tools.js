@@ -28,11 +28,17 @@ const notices = ['# Build tool notices and source code', '',
 if (platform === 'darwin') notices.push('Apple Command Line Tools, its SDK/compiler, and Rosetta are not included. The clang/clang++ wrapper scripts invoke the existing Apple compiler installed by the user.', '');
 const packages = [];
 const downloaded = new Map();
-// Use a mirror only when the recipe pins these exact upstream bytes.
+// Use a mirror only when the recipe pins these exact upstream bytes. invisible-mirror.net refuses GitHub's
+// runners (403); GNU's mirror has the same tarballs, and the recipe's SHA-256 is checked either way.
 const SOURCE_MIRRORS = {
   '053794d6671a3e397d849e478a80b82a63cb9d8ca296bd35b73317bb5ceb87b5':
     ['https://ftp.osuosl.org/pub/gentoo/distfiles/62/pulseaudio-17.0.tar.xz']
 };
+function mirrorsFor(url, expected) {
+  const ncurses = url.match(/\/(ncurses-[0-9.]+\.tar\.gz)$/)?.[1];
+  return [...(SOURCE_MIRRORS[expected] || []), ...(ncurses && expected
+    ? [`https://ftpmirror.gnu.org/ncurses/${ncurses}`, `https://ftp.gnu.org/gnu/ncurses/${ncurses}`] : [])];
+}
 
 function flattenLinks(prefix, toolTree = fs.realpathSync(prefix)) {
   if (platform !== 'win32') fs.chmodSync(prefix, fs.statSync(prefix).mode | 0o700);
@@ -69,7 +75,7 @@ async function downloadSource(url, name, expected = null) {
   const destination = path.join(sourceRoot, 'upstream', name.replace(/[^a-zA-Z0-9._-]/g, '_'));
   let downloadedUrl = url;
   if (!fs.existsSync(destination) || (expected && await tools.hashFile(destination) !== expected)) {
-    const candidates = [url, ...(SOURCE_MIRRORS[expected] || [])];
+    const candidates = [url, ...mirrorsFor(url, expected)];
     for (let index = 0; index < candidates.length; index++) {
       try {
         await run(platform === 'win32' ? path.join(root, 'msys64', 'usr', 'bin', 'curl.exe')
