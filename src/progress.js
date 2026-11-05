@@ -74,7 +74,24 @@ function activityFromLine(line) {
   return null;
 }
 
-function createActivityReader() { return activityFromLine; }
+// The port's build runs ninja three times (the game, the game again once every function's arguments are known,
+// the renderer), each counting from one. Each gets its part of one bar, which only moves forward.
+const BUILD_STAGES = [[0, 60], [60, 90], [90, 100]];
+
+function createActivityReader() {
+  let stage = 0, last = 0, bar = 0;
+  return function read(line) {
+    const activity = activityFromLine(line);
+    const steps = cleanOutputLine(line).trim().match(/^\[\s*(\d+)\s*\/\s*\d+\]/);
+    if (!activity || !steps || !Number.isFinite(activity.percent)) return activity;
+    const completed = Number(steps[1]);
+    if (completed < last && stage < BUILD_STAGES.length - 1) stage += 1;
+    last = completed;
+    const [from, to] = BUILD_STAGES[stage];
+    bar = Math.max(bar, Math.floor(from + (to - from) * activity.percent / 100));
+    return { detail: activity.detail.replace(/ · [\d,]+ of [\d,]+ steps$/, ''), percent: bar };
+  };
+}
 
 // A task that did not exit by itself. Its last output is then whatever it
 // printed before, not the reason. Linux: killed by the signal (the game's crash

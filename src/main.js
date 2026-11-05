@@ -705,8 +705,14 @@ async function play(installation = null) {
   const recordedTools = game.toolRoot(root);
   const env = recordedTools ? buildTools.environmentAtRoot(recordedTools, playEnv) : toolEnv(playEnv);
   const cmd = port.gameRunCommand(root, rom, process.platform, env);
+  const startedAt = Date.now();
   try {
     return await launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, PLAY_LABEL, true);
+  } catch (error) {
+    // Stop game ends it on purpose: that is no failure to report.
+    if (!wasStopped(startedAt)) throw error;
+    log('Stopped the game.');
+    return { ok: true };
   } finally {
     try { makeSaveBackup('after-play'); }
     catch (error) { log(`Save backup failed: ${error.message}`); }

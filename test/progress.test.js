@@ -109,3 +109,17 @@ test('a crash is reported as a crash, not as the last warning the game printed',
     assert.equal(crashReason(code, signal, platform), null);
 });
 
+
+test('the port\'s three ninja runs share one bar that only moves forward', () => {
+  const read = require('../src/progress').createActivityReader();
+  const percent = line => read(line)?.percent;
+  assert.equal(percent('[1632/3264] IR a.c'), 30);
+  assert.equal(percent('[3264/3264] OBJ b.o'), 60);
+  assert.equal(percent('[207/3173] IR a.c'), 61);
+  assert.equal(percent('[3173/3173] OBJ b.o'), 90);
+  assert.equal(percent('[1/87] Building CXX object x.o'), 90);
+  assert.equal(percent('[87/87] Linking CXX static library libsms_gx.a'), 100);
+  assert.deepEqual(read('[10/87] Building CXX object y.o'), { detail: 'Building your game', percent: 100 });
+  // what isn't ninja's goes through as it was
+  assert.deepEqual(read('Texture download: 500000000/1000000000 bytes'), { detail: 'Downloading HD textures · 500 MB of 1,000 MB', percent: 50 });
+});
