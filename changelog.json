@@ -1,6 +1,8 @@
 {
   "beta": {
-    "launcher": [],
+    "launcher": [
+      "Fixed Windows builds with your own MSYS2, set with the COLO_MSYS2_ROOT environment variable, looking for the game's compiler in a folder that MSYS2 doesn't have."
+    ],
     "game": []
   },
   "releases": [

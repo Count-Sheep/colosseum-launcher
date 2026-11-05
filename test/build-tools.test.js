@@ -234,6 +234,12 @@ test('an explicit COLO_MSYS2_ROOT replaces the bundled Windows tools without dow
   assert.equal(env.MSYS2_ROOT, own);
   assert.equal(env.MSYSTEM, 'MINGW64');
   assert.ok(env.PATH.startsWith(`${path.join(own, 'mingw64', 'bin')};${path.join(own, 'usr', 'bin')};`));
+  // Their MSYS2 has no zig: the port downloads its own, or uses the clang they name.
+  assert.equal('COLO_CLANG' in env, false);
+  assert.equal('COLO_CLANG_INC' in env, false);
+  const clang = { COLO_CLANG: '"C:/zig/zig.exe" clang', COLO_CLANG_INC: 'C:/zig/lib/include' };
+  assert.deepEqual((({ COLO_CLANG, COLO_CLANG_INC }) => ({ COLO_CLANG, COLO_CLANG_INC }))(
+    tools.environment(userData, { PATH: 'system', COLO_MSYS2_ROOT: own, ...clang }, 'win32')), clang);
   // Play's recorded toolset still yields to the player's choice.
   fs.mkdirSync(path.join(userData, 'recorded', 'msys64'), { recursive: true });
   assert.equal(tools.environmentAtRoot(path.join(userData, 'recorded'), { COLO_MSYS2_ROOT: own }, 'win32').MSYS2_ROOT, own);

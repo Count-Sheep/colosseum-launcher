@@ -294,8 +294,9 @@ function environmentAtRoot(root, base = process.env, platform = process.platform
   }
   const msys = own || path.join(root, 'msys64');
   base = withCertificates(withoutHostPython(base), msys, 'mingw64');
+  // A player's own MSYS2 has no zig: their COLO_CLANG stands, and without one the port downloads its own.
   return { ...prependWindowsPath(base, [path.join(msys, 'mingw64', 'bin'), path.join(msys, 'usr', 'bin')]),
-    MSYS2_ROOT: msys, MSYSTEM: 'MINGW64', CHERE_INVOKING: '1', ...zigCompiler(path.join(msys, 'zig', 'zig.exe')) };
+    MSYS2_ROOT: msys, MSYSTEM: 'MINGW64', CHERE_INVOKING: '1', ...(own ? {} : zigCompiler(path.join(msys, 'zig', 'zig.exe'))) };
 }
 
 // Another Python's PYTHONPATH or PYTHONHOME makes the bundled Python load that
