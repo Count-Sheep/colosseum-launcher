@@ -140,7 +140,7 @@ npm run dist -- --linux --x64     # or --win --x64, --mac --universal
 
 See [docs/build-tools.md](docs/build-tools.md).
 
-**Your own MSYS2 (Windows, advanced).** Set the environment variable `COLO_MSYS2_ROOT` to an MSYS2 folder (the one containing `usr` and `mingw64`) and restart the launcher. It then uses that MSYS2 for every build and never downloads its own Windows tools. This is for setups the prepared tools cannot run on. Install the packages from MinGW64: `pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-SDL2 mingw-w64-x86_64-ninja mingw-w64-x86_64-python patch git rsync curl unzip`. The game's build downloads zig 0.14.1 into the game folder for its clang. To use another clang 19 or newer, set `COLO_CLANG` to the command (such as `"C:/zig/zig.exe" clang`) and `COLO_CLANG_INC` to its headers (such as `C:/zig/lib/include`). Unset `COLO_MSYS2_ROOT` to go back to the prepared tools.
+**Your own MSYS2 (Windows, advanced).** Set the environment variable `COLO_MSYS2_ROOT` to an MSYS2 folder (the one containing `usr` and `mingw64`) and restart the launcher. It then uses that MSYS2 for every build and never downloads its own Windows tools. This is for setups the prepared tools cannot run on. Install the packages from MinGW64: `pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-SDL2 mingw-w64-x86_64-ninja mingw-w64-x86_64-python patch git rsync curl unzip`. The game's build downloads llvm-mingw into the game folder for its clang. To use another clang 19 or newer, set `COLO_CLANG` to the command (such as `"C:/llvm/bin/clang-19.exe"`) and `COLO_CLANG_INC` to its headers (such as `C:/llvm/lib/clang/19/include`). Unset `COLO_MSYS2_ROOT` to go back to the prepared tools.
 
 ### Build caches
 

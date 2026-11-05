@@ -11,13 +11,13 @@
       "notices": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-linux-x64-2026-11-05.1/colo-build-tools-linux-x64-2026-11-05.1-NOTICES.md"
     },
     "win32": {
-      "toolset": "2026-11-05.1",
-      "name": "colo-build-tools-windows-x64-2026-11-05.1.tar.gz",
-      "url": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-windows-x64-2026-11-05.1/colo-build-tools-windows-x64-2026-11-05.1.tar.gz",
-      "sha256": "4e5edc457579421e51d96ec524a061e30234adc9a5a78c7784a7a06e02bdad87",
-      "size": 494855965,
-      "sources": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-windows-x64-2026-11-05.1/colo-build-tools-windows-x64-2026-11-05.1-sources.tar.gz",
-      "notices": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-windows-x64-2026-11-05.1/colo-build-tools-windows-x64-2026-11-05.1-NOTICES.md"
+      "toolset": "2026-11-05.2",
+      "name": "colo-build-tools-windows-x64-2026-11-05.2.tar.gz",
+      "url": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-windows-x64-2026-11-05.2/colo-build-tools-windows-x64-2026-11-05.2.tar.gz",
+      "sha256": "a3a916d192b16638548613423e6a6cbba23c05d3441583ae2792ab77fff98f93",
+      "size": 498960348,
+      "sources": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-windows-x64-2026-11-05.2/colo-build-tools-windows-x64-2026-11-05.2-sources.tar.gz",
+      "notices": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-windows-x64-2026-11-05.2/colo-build-tools-windows-x64-2026-11-05.2-NOTICES.md"
     }
   }
 }

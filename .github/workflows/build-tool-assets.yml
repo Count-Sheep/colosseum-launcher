@@ -15,6 +15,10 @@ on:
         description: Optional previous run with a successful compile check; retry publication only
         type: string
         default: ""
+      publish:
+        description: Publish the archives once they pass; off, the run only builds and checks them
+        type: boolean
+        default: true
 permissions:
   contents: read
   actions: read
@@ -67,7 +71,7 @@ jobs:
           if-no-files-found: error
   publish:
     needs: prepare-tools
-    if: always() && (inputs.verified_run != '' || needs.prepare-tools.result == 'success')
+    if: always() && inputs.publish && (inputs.verified_run != '' || needs.prepare-tools.result == 'success')
     runs-on: ubuntu-22.04
     permissions:
       contents: write

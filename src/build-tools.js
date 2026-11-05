@@ -69,7 +69,7 @@ const TOOL_FILES = {
   win32: ['usr/bin/bash.exe', 'usr/bin/git.exe', 'usr/bin/patch.exe', 'usr/bin/rsync.exe',
     'mingw64/bin/gcc.exe', 'mingw64/bin/g++.exe', 'mingw64/bin/as.exe', 'mingw64/bin/ld.exe', 'mingw64/bin/objcopy.exe',
     'mingw64/bin/nm.exe', 'mingw64/bin/windres.exe', 'mingw64/bin/cmake.exe', 'mingw64/bin/ninja.exe', 'mingw64/bin/python.exe',
-    'mingw64/lib/libSDL2.a', 'mingw64/include/SDL2/SDL.h', 'zig/zig.exe',
+    'mingw64/lib/libSDL2.a', 'mingw64/include/SDL2/SDL.h', 'llvm-mingw/bin/clang-19.exe',
     ...['cc1.exe', 'cc1plus.exe', 'collect2.exe'].map(name => `mingw64/lib/gcc/x86_64-w64-mingw32/${WINDOWS_GCC}/${name}`),
     'mingw64/x86_64-w64-mingw32/bin/as.exe', 'mingw64/x86_64-w64-mingw32/bin/ld.exe'].map(file => path.join('msys64', ...file.split('/'))),
   linux: [...['g++', 'git', 'cmake', 'ninja', 'python3', 'make', 'patch', 'rsync', 'objcopy', 'nm'].map(name => path.join('env', 'bin', name)),
@@ -254,11 +254,17 @@ function environment(userData, base = process.env, platform = process.platform) 
   return environmentAtRoot(privateReady(userData, platform) ? rootFor(userData, platform) : null, base, platform);
 }
 
-// zig's clang compiles the game code, as the port's own builds have it; its path can hold a space, and the
+// zig's clang compiles the game code on Linux and macOS, as the port's own builds have it; its path can hold a space, and the
 // port reads the command as shell words.
 function zigCompiler(zig) {
   const folder = path.dirname(zig).replaceAll('\\', '/');
   return { COLO_CLANG: `"${zig.replaceAll('\\', '/')}" clang`, COLO_CLANG_INC: `${folder}/lib/include` };
+}
+
+// On Windows it is llvm-mingw's clang, which runs where zig.exe does not (Windows 7).
+function llvmMingwCompiler(folder) {
+  const forward = folder.replaceAll('\\', '/');
+  return { COLO_CLANG: `"${forward}/bin/clang-19.exe"`, COLO_CLANG_INC: `${forward}/lib/clang/19/include` };
 }
 
 function environmentAtRoot(root, base = process.env, platform = process.platform) {
@@ -294,9 +300,9 @@ function environmentAtRoot(root, base = process.env, platform = process.platform
   }
   const msys = own || path.join(root, 'msys64');
   base = withCertificates(withoutHostPython(base), msys, 'mingw64');
-  // A player's own MSYS2 has no zig: their COLO_CLANG stands, and without one the port downloads its own.
+  // A player's own MSYS2 has no compiler for the game: their COLO_CLANG stands, and without one the port downloads its own.
   return { ...prependWindowsPath(base, [path.join(msys, 'mingw64', 'bin'), path.join(msys, 'usr', 'bin')]),
-    MSYS2_ROOT: msys, MSYSTEM: 'MINGW64', CHERE_INVOKING: '1', ...(own ? {} : zigCompiler(path.join(msys, 'zig', 'zig.exe'))) };
+    MSYS2_ROOT: msys, MSYSTEM: 'MINGW64', CHERE_INVOKING: '1', ...(own ? {} : llvmMingwCompiler(path.join(msys, 'llvm-mingw'))) };
 }
 
 // Another Python's PYTHONPATH or PYTHONHOME makes the bundled Python load that

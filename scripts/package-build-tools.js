@@ -147,6 +147,16 @@ async function zigSources() {
   notices.push(`- zig ${version} (MIT; the bundled LLVM, Clang and C libraries under their own licenses, listed in its archive)`);
 }
 
+// llvm-mingw's own release: its build scripts, and the LLVM it builds.
+async function llvmMingwSources() {
+  const { LLVM_MINGW } = require('./bootstrap-build-tools');
+  const version = LLVM_MINGW.url.match(/\/download\/([0-9]+)\//)[1];
+  const scripts = await downloadSource(`https://github.com/mstorsjo/llvm-mingw/archive/refs/tags/${version}.tar.gz`, `llvm-mingw-${version}.tar.gz`);
+  const llvm = await downloadSource(`https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_MINGW.llvm}/llvm-project-${LLVM_MINGW.llvm}.src.tar.xz`, `llvm-project-${LLVM_MINGW.llvm}.src.tar.xz`);
+  packages.push({ name: 'llvm-mingw', version, license: 'Apache-2.0 WITH LLVM-exception', binary: LLVM_MINGW.url, sources: [scripts, llvm] });
+  notices.push(`- llvm-mingw ${version} (LLVM ${LLVM_MINGW.llvm}, Apache-2.0 WITH LLVM-exception; the other licenses it carries are in its LICENSE.TXT)`);
+}
+
 function dbField(text, name) { return text.match(new RegExp(`%${name}%\\r?\\n([\\s\\S]*?)(?:\\r?\\n\\r?\\n|$)`))?.[1].trim() || ''; }
 
 async function windowsSources() {
@@ -179,7 +189,7 @@ async function main() {
   const name = `colo-build-tools-${id}-${toolset}.tar.gz`;
   const archive = path.join(output, name);
   const noticesFile = `colo-build-tools-${id}-${toolset}-NOTICES.md`;
-  await zigSources();
+  await (platform === 'win32' ? llvmMingwSources() : zigSources());
   if (platform !== 'win32') {
     await condaSources();
     const prefix = path.join(root, 'env');
