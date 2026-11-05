@@ -102,6 +102,8 @@ function normalizeSettings(input = {}, platform = process.platform) {
       : choiceSetting(input.display, ['launcher', 'primary'], 'launcher'),
     vsync: choiceSetting(input.vsync, ['off', 'on', 'adaptive'], 'off'),
     skipMovies: Boolean(input.skipMovies),
+    // How a battle's animations play: as on the disc, 4 or 8 times faster, or skipped.
+    battleSpeed: choiceSetting(input.battleSpeed, ['normal', '4', '8', 'skip'], 'normal'),
     // The frame-time overlay at start.
     overlay: Boolean(input.overlay),
     // The fonts drawn sharp from the Inter typeface (on), the game's own upscaled, or as on the disc.
@@ -224,6 +226,7 @@ function buildEnvironment(settings, disc, root, { customTextures = null } = {}) 
     SMS_GX_SHADER_WARMUP: settings.shaderWarmup === false ? '0' : '1'
   };
   if (settings.skipMovies) env.COLO_SKIP_MOVIES = '1';
+  if (settings.battleSpeed !== 'normal') env.COLO_BATTLE_SPEED = settings.battleSpeed;
   // Unset is the default; any other value would name a glyph file.
   if (settings.hdText !== 'on') env.COLO_HD_TEXT = settings.hdText === 'off' ? '0' : 'upscaled';
   if (/^\d+x\d+$/.test(settings.exclusiveResolution || '')) env.SMS_FULLSCREEN_MODE = settings.exclusiveResolution;

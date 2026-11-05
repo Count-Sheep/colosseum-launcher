@@ -1,7 +1,11 @@
 {
   "beta": {
-    "launcher": [],
-    "game": []
+    "launcher": [
+      "Battle animations: play moves, send-outs and HP bars at 4× or 8× speed, or skip them. Find it under Gameplay."
+    ],
+    "game": [
+      "Battle animations can run at 4× or 8× speed or be skipped, with menus at normal speed and text up long enough to read."
+    ]
   },
   "releases": [
     {
