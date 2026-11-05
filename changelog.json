@@ -1,7 +1,8 @@
 {
   "beta": {
     "launcher": [
-      "Fixed Windows builds with your own MSYS2, set with the COLO_MSYS2_ROOT environment variable, looking for the game's compiler in a folder that MSYS2 doesn't have."
+      "Fixed Windows builds with your own MSYS2, set with the COLO_MSYS2_ROOT environment variable, looking for the game's compiler in a folder that MSYS2 doesn't have.",
+      "Fixed a game download stopping at Prepare port source when a newer game commit is chosen under Settings, Manage game, Game source."
     ],
     "game": []
   },
