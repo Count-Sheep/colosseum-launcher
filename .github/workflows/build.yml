@@ -218,6 +218,7 @@ jobs:
       game-renderer: ${{ needs.plan.outputs.renderer }}
       game-renderer-decomp: ${{ needs.plan.outputs.renderer_decomp }}
       game-version: ${{ needs.plan.outputs.game_version }}
+      reuse-passed: true
     permissions:
       contents: read
   publish:

@@ -4,6 +4,9 @@ name: Game build
 # starts the game far enough to reach its disc check. No disc image is used and no game binary is published.
 # It runs for pull requests, before every release (release.yml) and Beta (build.yml), and weekly, so a change to GitHub's runners,
 # the toolsets or a repository the game builds from shows up.
+# A pull request or Beta skips the build on a system where these exact inputs already built and started: the game's
+# pins, the tools, the launcher code that builds it and this workflow. Beta's game version names the day, so Beta
+# still builds on each system once a day. Weekly runs and releases always build, and record what passed.
 on:
   pull_request:
   schedule:
@@ -34,6 +37,10 @@ on:
       game-version:
         type: string
         default: ci
+      reuse-passed:
+        description: Skip the build on a system where these exact inputs already passed
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -56,7 +63,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --ignore-scripts
       - name: Point the launcher at the game commit to build
         if: inputs.game-commit != ''
         shell: bash
@@ -67,26 +73,61 @@ jobs:
           RENDERER_DECOMP: ${{ inputs.game-renderer-decomp }}
           VERSION: ${{ inputs.game-version }}
         run: node scripts/pin-game.js
+      # Everything a build reads from this repository, after the pin above. Left out: the launcher's windows, which
+      # scripts/smoke-build-tools.js never loads, so a change to those alone doesn't build the game again.
+      - name: Name this build's inputs
+        id: inputs
+        shell: bash
+        env:
+          HASH: ${{ hashFiles('src/**', 'scripts/**', 'package-lock.json', '.github/workflows/game-build.yml', '!src/main.js', '!src/preload.js', '!src/renderer.js', '!src/index.html', '!src/style.css', '!src/assets/**', '!scripts/discord-beta.js') }}
+        run: echo "key=game-build-passed-v1-${{ matrix.os }}-$HASH" >> "$GITHUB_OUTPUT"
+      - name: Look for a passed build of these inputs
+        id: passed
+        if: inputs.reuse-passed || github.event_name == 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: .game-build-passed
+          key: ${{ steps.inputs.outputs.key }}
+          lookup-only: true
+      - name: Say the build is skipped
+        if: steps.passed.outputs.cache-hit == 'true'
+        run: echo "::notice::These exact inputs already built and started on ${{ matrix.os }}, so this run skips the build."
+      - run: npm ci --ignore-scripts
+        if: steps.passed.outputs.cache-hit != 'true'
       - name: Enable Intel execution on the Apple Silicon runner
-        if: matrix.os == 'macos-15'
+        if: matrix.os == 'macos-15' && steps.passed.outputs.cache-hit != 'true'
         run: sudo softwareupdate --install-rosetta --agree-to-license
       # One archive per system, restored from the newest on main and saved by every run that isn't for a pull
       # request, so pull requests read main's but can't fill the repository's 10 GB. The build goes through it as a
       # player's does (src/compiler-cache.js): the folder has a space in its name, as players' often do.
       - name: Restore build caches
+        if: steps.passed.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/Build Cache
           key: build-cache-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: build-cache-${{ matrix.os }}-
       - name: Build and start the game with the private tools
+        if: steps.passed.outputs.cache-hit != 'true'
         run: node scripts/smoke-build-tools.js
         env:
           COLO_SMOKE_SYSTEM32_DECOYS: ${{ runner.os == 'Windows' && '1' || '0' }}
           COLO_COMPILER_CACHE_DIR: ${{ runner.temp }}/Build Cache
       - name: Save build caches
-        if: (success() || failure()) && github.event_name != 'pull_request'
+        if: (success() || failure()) && github.event_name != 'pull_request' && steps.passed.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/Build Cache
           key: build-cache-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+      # Only after the game built and reached its disc check. A later full run of the same inputs finds the key taken
+      # and only warns.
+      - name: Note that these inputs passed
+        if: github.event_name != 'pull_request' && steps.passed.outputs.cache-hit != 'true'
+        shell: bash
+        run: date -u > .game-build-passed
+      - name: Save the note
+        if: github.event_name != 'pull_request' && steps.passed.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .game-build-passed
+          key: ${{ steps.inputs.outputs.key }}

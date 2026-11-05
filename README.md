@@ -144,7 +144,7 @@ See [docs/build-tools.md](docs/build-tools.md).
 
 ### Build caches
 
-Every game version builds in a folder of its own, so a build keeps what it compiled for the next. The game's units go through the port's `tools/unit_cache.py`, keyed on the preprocessed source, flags, symbol tables and tool versions, and the renderer through `ccache`. Results name no path of the build, so they hold in any folder. They live in `compiler-cache` in the launcher's data folder, trimmed to about 2.5 GB, and **Free up space** clears them. A failed build through them is tried once without. **Game build** keeps the same caches between CI runs (`COLO_COMPILER_CACHE_DIR`).
+Every game version builds in a folder of its own, so a build keeps what it compiled for the next. The game's units go through the port's `tools/unit_cache.py`, keyed on the preprocessed source, flags, symbol tables and tool versions, and the renderer through `ccache`. Results name no path of the build, so they hold in any folder. They live in `compiler-cache` in the launcher's data folder, trimmed to about 2.5 GB, and **Free up space** clears them. A failed build through them is tried once without. **Game build** keeps the same caches between CI runs (`COLO_COMPILER_CACHE_DIR`). A pull request or Beta also skips the build on a system where the exact same inputs already built and started: the game's pins, the tools, the launcher code that builds it and the workflow. Beta's game version names the day, so Beta still builds on each system once a day. Weekly runs and releases always build.
 
 ### Versions and releases
 
