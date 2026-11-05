@@ -1,8 +1,8 @@
 {
-  "version": "2026.11.05.2",
+  "version": "2026.11.05.3",
   "repository": "https://git.softwareauralabs.com/chase/pokemon-colosseum.git",
   "branch": "master",
-  "commit": "227d4325f5fd00c39d17a6912254c5f88148b442",
+  "commit": "26351cd123e96f5798c1905cca9129c25fee527f",
   "portPatch": "port-launcher.patch",
   "decompRepository": "https://github.com/dougchansan/pkmn-colosseum.git",
   "decomp": "0275f31498f43ad807d4c91fa2da95ede5f5291b",

@@ -1,16 +1,30 @@
 {
   "beta": {
-    "launcher": [
-      "Fixed Windows builds with your own MSYS2, set with the COLO_MSYS2_ROOT environment variable, looking for the game's compiler in a folder that MSYS2 doesn't have.",
-      "Fixed a game download stopping at Prepare port source when a newer game commit is chosen under Settings, Manage game, Game source.",
-      "Windows builds now use a compiler that also runs on Windows 7, which the previous one could not."
-    ],
-    "game": [
-      "Fixed builds reporting success when the game's compiler couldn't run: they now stop and say why.",
-      "Fixed a rare build that left out part of the battle menus' code."
-    ]
+    "launcher": [],
+    "game": []
   },
   "releases": [
+    {
+      "version": "0.1.2",
+      "date": "2026-11-05",
+      "launcher": [
+        "Fixed Windows builds with your own MSYS2, set with the COLO_MSYS2_ROOT environment variable, looking for the game's compiler in a folder that MSYS2 doesn't have.",
+        "Fixed a game download stopping at Prepare port source when a newer game commit is chosen under Settings, Manage game, Game source.",
+        "Windows builds now use a compiler that also runs on Windows 7, which the previous one could not.",
+        "The first game build on Windows after this update takes longer, as it starts over with the new compiler."
+      ],
+      "game": {
+        "version": "2026.11.05.3",
+        "commit": "26351cd123e96f5798c1905cca9129c25fee527f",
+        "changes": [
+          "Fixed builds reporting success when the game's compiler couldn't run: they now stop and say why.",
+          "Fixed a rare build that left out part of the battle menus' code.",
+          "Fixed Battle Now's party check overwriting nearby memory, which stopped the game on Arch Linux.",
+          "Fixed the game failing as it started when built on Arch Linux and other systems not based on Debian.",
+          "Fixed the game not fully unloading map code it had finished with."
+        ]
+      }
+    },
     {
       "version": "0.1.1",
       "date": "2026-11-05",
