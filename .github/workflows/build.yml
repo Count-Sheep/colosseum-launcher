@@ -46,6 +46,7 @@ jobs:
       title: ${{ steps.plan.outputs.title }}
       game: ${{ steps.plan.outputs.game }}
       game_version: ${{ steps.plan.outputs.game_version }}
+      previous: ${{ steps.plan.outputs.previous }}
       decomp: ${{ steps.plan.outputs.decomp }}
       renderer: ${{ steps.plan.outputs.renderer }}
       renderer_decomp: ${{ steps.plan.outputs.renderer_decomp }}
@@ -87,6 +88,8 @@ jobs:
             game=$(sed -n 's/^commit=//p' "$GITHUB_OUTPUT" | tail -1)
             out game "$game"; out game_version "$(date -u +%Y.%m.%d)-beta.${game:0:7}"
             echo "Beta game: ${game:0:7}"
+            # The launcher commit of the Beta this replaces, so Discord hears only what is new since.
+            out previous "$(gh release view beta --json body --jq .body 2>/dev/null | sed -n 's/.*<!-- beta launcher=\([0-9a-f]*\) .*/\1/p')"
           fi
   package:
     needs: plan
@@ -259,6 +262,39 @@ jobs:
           gh api "repos/$GH_REPO/commits/$SHA" --silent 2>/dev/null || target=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
           gh release delete "$CHANNEL" --cleanup-tag --yes 2>/dev/null || true
           gh release create "$CHANNEL" dist/* --prerelease --latest=false --target "$target" --title "$title" --notes "$notes"
+  # Tells a Discord channel about each new Beta through the webhook in the
+  # DISCORD_BETA_WEBHOOK secret (Discord: channel settings > Integrations >
+  # Webhooks). Without the secret this does nothing.
+  discord:
+    needs: [plan, publish]
+    if: needs.plan.outputs.channel == 'beta'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          sparse-checkout: |
+            scripts/discord-beta.js
+            src/game-release.json
+            changelog.json
+          sparse-checkout-cone-mode: false
+      - name: Find the notes the last Beta announced
+        if: needs.plan.outputs.previous != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS: ${{ needs.plan.outputs.previous }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/contents/changelog.json?ref=$PREVIOUS" -H 'Accept: application/vnd.github.raw' > "$RUNNER_TEMP/previous-changelog.json" \
+            || echo "::warning::Could not read changelog.json at ${PREVIOUS:0:7}, so Discord gets all of Beta's notes."
+      - name: Announce the Beta on Discord
+        env:
+          PREVIOUS_CHANGELOG: ${{ runner.temp }}/previous-changelog.json
+          DISCORD_BETA_WEBHOOK: ${{ secrets.DISCORD_BETA_WEBHOOK }}
+          LAUNCHER_VERSION: ${{ needs.publish.outputs.version }}
+          LAUNCHER_SHA: ${{ needs.plan.outputs.sha }}
+          GAME_VERSION: ${{ needs.plan.outputs.game_version }}
+          GAME_COMMIT: ${{ needs.plan.outputs.game }}
+        run: node scripts/discord-beta.js
   comment:
     needs: [plan, publish]
     if: needs.plan.outputs.pr != ''
