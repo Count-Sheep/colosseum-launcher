@@ -9,8 +9,8 @@ function fixture({ prefix = '/opt/homebrew', missing = [], sdk = true, silicon =
   rosetta = true, cmakeVersion = '3.31.6', sdks = [], unlinkable = [] } = {}) {
   const files = new Set([
     ...['git', 'make', 'patch', 'curl', 'hdiutil', 'clang', 'clang++', 'python3'].map(name => `/usr/bin/${name}`),
-    ...['brew', 'cmake', 'python3', '7zz'].map(name => `${prefix}/bin/${name}`),
-    ...['llvm-objcopy', 'clang', 'clang++'].map(name => `${prefix}/opt/llvm/bin/${name}`)
+    ...['brew', 'cmake', 'python3'].map(name => `${prefix}/bin/${name}`),
+    ...['llvm-objcopy', 'llvm-nm', 'ld.lld', 'clang', 'clang++'].map(name => `${prefix}/opt/llvm/bin/${name}`)
   ].filter(file => !missing.includes(file.split('/').pop())));
   const calls = [];
   const exists = file => files.has(file);
@@ -31,7 +31,7 @@ test('Finder PATH resolves Homebrew tools on both Mac architectures without chan
   for (const prefix of ['/opt/homebrew', '/usr/local']) {
     const base = { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', HOME: '/Users/player' };
     const fake = fixture({ prefix, silicon: prefix === '/opt/homebrew' });
-    const report = mac.report(await mac.inspect(base, fake), { archives: true });
+    const report = mac.report(await mac.inspect(base, fake));
     assert.equal(report.ready, true);
     assert.equal(report.mode, 'system');
     assert.ok(fake.calls.some(call => call.command === `${prefix}/bin/cmake`));
@@ -43,11 +43,11 @@ test('Finder PATH resolves Homebrew tools on both Mac architectures without chan
 test('fresh Mac is not ready and gets instructions for every missing requirement', async () => {
   assert.equal(tools.status('/unused', 'darwin').ready, false);
   const fake = fixture({ sdk: false, rosetta: false,
-    missing: ['cmake', 'python3', 'llvm-objcopy', '7zz', 'brew'] });
-  const report = mac.report(await mac.inspect({ PATH: '/usr/bin:/bin' }, fake), { archives: true });
+    missing: ['cmake', 'python3', 'llvm-objcopy', 'brew'] });
+  const report = mac.report(await mac.inspect({ PATH: '/usr/bin:/bin' }, fake));
   assert.equal(report.ready, false);
   assert.equal(report.needsHomebrew, true);
-  assert.equal(report.commands, 'xcode-select --install\nsoftwareupdate --install-rosetta\nbrew install cmake python3 llvm sevenzip');
+  assert.equal(report.commands, 'xcode-select --install\nsoftwareupdate --install-rosetta\nbrew install cmake python3 llvm lld');
   assert.match(report.message, /CMake/);
 });
 
@@ -60,11 +60,7 @@ test('SDK and Rosetta are verified even when compiler executables exist', async 
   }
 });
 
-test('rejects old CMake and requires 7-Zip only for textures or Eclipse', async () => {
-  const inspection = await mac.inspect({}, fixture({ missing: ['7zz'] }));
-  assert.equal(mac.report(inspection).ready, true);
-  assert.equal(mac.report(inspection, { archives: true }).ready, false);
-  assert.equal(mac.report(inspection, { archives: true }).commands, 'brew install sevenzip');
+test('rejects old CMake', async () => {
   const old = mac.report(await mac.inspect({}, fixture({ cmakeVersion: '3.19.8' })));
   assert.equal(old.ready, false);
   assert.equal(old.commands, 'brew install cmake');
@@ -76,12 +72,12 @@ test('supports an explicit Homebrew prefix for tools installed outside the defau
 });
 
 test('private tools take priority and managed setup asks only for Apple installs', async () => {
-  const fake = fixture({ sdk: false, rosetta: false, missing: ['cmake', 'python3', 'llvm-objcopy', '7zz', 'brew'] });
-  const report = mac.report(await mac.inspect({ PATH: '/usr/bin:/bin' }, fake), { archives: true, managed: true });
+  const fake = fixture({ sdk: false, rosetta: false, missing: ['cmake', 'python3', 'llvm-objcopy', 'brew'] });
+  const report = mac.report(await mac.inspect({ PATH: '/usr/bin:/bin' }, fake), { managed: true });
   assert.equal(report.commands, 'xcode-select --install\nsoftwareupdate --install-rosetta');
   assert.equal(report.needsHomebrew, false);
   assert.ok(!fake.calls.some(call => ['/usr/bin/git', '/usr/bin/python3', '/usr/bin/clang', '/usr/bin/clang++'].includes(call.command)));
-  const env = mac.environment({ PATH: '/usr/bin:/bin', SMS_BUILD_TOOLS_BIN: '/Users/player/Library/Application Support/Colosseum Launcher/build-tools/macos-arm64/env/bin' }, fixture().exists);
+  const env = mac.environment({ PATH: '/usr/bin:/bin', COLO_BUILD_TOOLS_BIN: '/Users/player/Library/Application Support/Colosseum Launcher/build-tools/macos-arm64/env/bin' }, fixture().exists);
   assert.equal(env.PATH.split(':')[0], '/Users/player/Library/Application Support/Colosseum Launcher/build-tools/macos-arm64/env/bin');
 });
 
@@ -109,14 +105,6 @@ test('falls back to the default SDK when no SDK links', async () => {
   assert.equal((await mac.inspect({}, fake)).sdkPath, '/SDK/MacOSX.sdk');
 });
 
-test('the Apple Silicon build does not need Rosetta', async () => {
-  const inspection = await mac.inspect({}, fixture({ rosetta: false }));
-  const native = mac.report(inspection, { rosetta: false });
-  assert.equal(native.ready, true);
-  assert.equal(native.commands, '');
-  assert.equal(mac.report(inspection).ready, false);
-});
-
 test('a tool that fails to start says why: its exit code and error, a signal, or a timeout',
   { skip: process.platform === 'win32' && 'Uses a POSIX shell.' }, async () => {
   const sh = (script, timeout) => mac.probe('/bin/sh', ['-c', script], process.env, timeout);
@@ -136,10 +124,10 @@ test('when the launcher\'s own tools do not run, the message names each one and 
     if (command?.endsWith('/llvm-objcopy')) return { ok: false, stdout: '', problem: 'llvm-objcopy was stopped by SIGKILL' };
     return run(command, args, env);
   };
-  const report = mac.report(await mac.inspect({}, { ...fake, timeout: 60000 }), { archives: true, managed: true });
+  const report = mac.report(await mac.inspect({}, { ...fake, timeout: 60000 }), { managed: true });
   assert.equal(report.ready, false);
   assert.equal(report.message, 'The downloaded build tools did not run: CMake 3.20 or newer (cmake did not start within 60 s); ' +
-    'LLVM build tools (llvm-objcopy was stopped by SIGKILL); 7-Zip (HD textures and Eclipse) (7zz not found). ' +
+    'LLVM build tools (llvm-objcopy was stopped by SIGKILL). ' +
     'Try again, and if it happens again, share the activity log.');
   const old = mac.report(await mac.inspect({}, fixture({ cmakeVersion: '3.19.8' })), { managed: true });
   assert.match(old.message, /CMake 3\.20 or newer \(cmake is too old: cmake version 3\.19\.8\)/);

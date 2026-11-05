@@ -21,17 +21,6 @@ test('uses Ninja completed steps on Windows and private Mac tools, including sma
     assert.equal(activityFromLine(invalid), null);
 });
 
-test('disc preparation remains a separate phase after compilation reaches 100 percent', () => {
-  assert.deepEqual(activityFromLine('[100%] Bundling /Users/player/Game.iso into sms-standalone'),
-    { detail: 'Preparing your game files', percent: null });
-  assert.deepEqual(activityFromLine('[1/1] Bundling C:/Games/Game.iso into sms-standalone'),
-    { detail: 'Preparing your game files', percent: null });
-  assert.deepEqual(activityFromLine('Built build/windows-64/sms.exe (windows, 64-bit)'),
-    { detail: 'Finishing setup', percent: null });
-  assert.deepEqual(activityFromLine('bundle_disc: wrote build/linux-64/sms-standalone (512 MiB)'),
-    { detail: 'Preparing your game files', percent: null });
-});
-
 test('reads pipe chunks, carriage-return progress, split Unicode, and the final error line without loss', () => {
   const output = Buffer.from('\x1b[2K[1/3] Building CXX object Mario.cpp.obj\r\n[2/3] Building CXX object Café.cpp.obj\r[3/3] Linking sms.exe\nerror: setup failed');
   const lines = [];
@@ -44,30 +33,19 @@ test('reads pipe chunks, carriage-return progress, split Unicode, and the final 
   assert.equal(cleanOutputLine('\x1b]8;;https://example.com\x1b\\Camera.cpp\x1b]8;;\x1b\\'), 'Camera.cpp');
 });
 
-test('reports texture install phases without inventing a download percentage', () => {
-  assert.deepEqual(activityFromLine('Downloading Super Mario Sunshine UHD Texture Pack v2.1.1'),
-    { detail: 'Downloading HD textures (about 1 GB)', percent: null });
-  assert.deepEqual(activityFromLine('Downloading Super Mario Sunshine HD texture extras v1.1.0'),
-    { detail: 'Downloading HD texture extras', percent: null });
-  assert.deepEqual(activityFromLine('Downloading Super Mario Sunshine language packs v1.0.0 (Français)'),
-    { detail: 'Downloading the language pack', percent: null });
-  assert.deepEqual(activityFromLine('Unpacking GMS.7z'), { detail: 'Installing HD textures', percent: null });
-  assert.deepEqual(activityFromLine('Installed 2180 textures in mods/textures/GMS.'),
-    { detail: 'HD textures installed', percent: 100 });
+test('reports the texture installer\'s phases', () => {
+  assert.deepEqual(activityFromLine('Checking the HD textures'), { detail: 'Checking HD textures', percent: null });
+  assert.deepEqual(activityFromLine('Installing HD textures: 1500/7498'), { detail: 'Installing HD textures · 1,500 of 7,498', percent: 20 });
+  assert.equal(activityFromLine('Installing HD textures: 9/3'), null);
+  assert.deepEqual(activityFromLine('Installed 7498 textures'), { detail: 'HD textures installed', percent: 100 });
 });
 
-test("reports Super Mario Eclipse's HD textures as they download and unpack", () => {
-  assert.deepEqual(activityFromLine('Downloading Super Mario Eclipse HiRes Texture Pack v5.1.0 (iZePlayzYT)'),
-    { detail: "Downloading Super Mario Eclipse's HD textures (about 9 GB)", percent: null });
-  assert.deepEqual(activityFromLine('Eclipse texture download: 4586852380/9172411025 bytes (2300/4651 textures)'),
-    { detail: "Downloading Super Mario Eclipse's HD textures · 4.6 GB of 9.2 GB", percent: 50 });
-  assert.deepEqual(activityFromLine('Eclipse texture download: 0/9172411025 bytes (0/4651 textures)'),
-    { detail: "Downloading Super Mario Eclipse's HD textures · 0.0 GB of 9.2 GB", percent: 0 });
-  assert.deepEqual(activityFromLine('Installed 4651 textures in mods/eclipse-textures; Super Mario Eclipse shows them with HD textures on.'),
-    { detail: "Super Mario Eclipse's HD textures installed", percent: 100 });
-  for (const invalid of ['Eclipse texture download: 5/4 bytes (1/2 textures)', 'Eclipse texture download: 1/4 bytes (3/2 textures)',
-    'Eclipse texture download: 0/0 bytes (0/0 textures)'])
-    assert.equal(activityFromLine(invalid), null);
+test('the end of the port\'s build is its own phase', () => {
+  assert.deepEqual(activityFromLine('game objs 1632 data syms 3335 stubs 28 fntab 7980'), { detail: 'Finishing setup', percent: null });
+  assert.deepEqual(activityFromLine('linked /games/colosseum/build/colosseum'), { detail: 'Finishing setup', percent: null });
+  assert.deepEqual(activityFromLine("Preparing the decomp's build"), { detail: "Preparing the game's source", percent: null });
+  assert.deepEqual(activityFromLine('[1632/3264] IR /games/colosseum/build/mirror/src/game/fight.c'),
+    { detail: 'Building your game · 1,632 of 3,264 steps', percent: 50 });
 });
 
 test('reports texture download bytes, handles unknown file sizes, and separates checksum checking', () => {
@@ -83,21 +61,6 @@ test('reports texture download bytes, handles unknown file sizes, and separates 
     assert.equal(activityFromLine(invalid), null);
 });
 
-
-test('HD movie setup reports its own download and complete-movie progress', () => {
-  assert.deepEqual(activityFromLine('Preparing HD cutscenes from your disc'),
-    { detail: 'Preparing HD cutscenes from your disc', percent: null });
-  assert.deepEqual(activityFromLine('HD movie download: 1500000/3000000 bytes'),
-    { detail: 'Downloading HD cutscenes · 1.5 of 3.0 MB', percent: 50 });
-  assert.deepEqual(activityFromLine('Installing HD cutscenes: 7/21 movies'),
-    { detail: 'Installing HD cutscenes · 7 of 21 movies', percent: 33 });
-  assert.deepEqual(activityFromLine('HD cutscenes installed: 21/21 movies'),
-    { detail: 'HD cutscenes installed', percent: 100 });
-  assert.equal(activityFromLine('HD movie download: 4000000/3000000 bytes'), null);
-  assert.deepEqual(activityFromLine('HD movie download: 1500000/3000000 bytes (movie 8/21)'),
-    { detail: 'Downloading HD cutscenes · movie 8 of 21 · 1.5 of 3.0 MB', percent: 35 });
-  assert.equal(activityFromLine('HD movie download: 1500000/3000000 bytes (movie 22/21)'), null);
-});
 
 test('failed tasks report the line that explains them', () => {
   assert.equal(failureReason([
@@ -129,41 +92,6 @@ test('failed tasks report the line that explains them', () => {
   assert.equal(failureReason([]), '');
 });
 
-test('names each Eclipse source while git downloads it', () => {
-  const read = createActivityReader();
-  assert.deepEqual(read('-- SMS_ECLIPSE: fetching bse fd6273014545ac0174fa54fada02edd9212f63d8'),
-    { detail: 'Downloading Eclipse sources · Better Sunshine Engine (2 of 4)', percent: null });
-  assert.deepEqual(read('remote: Counting objects: 100% (211/211), done.'),
-    { detail: 'Downloading Eclipse sources · Better Sunshine Engine (2 of 4) · waiting for GitHub', percent: null });
-  assert.equal(read('From https://github.com/JoshuaMKW/BetterSunshineEngine'), null);
-  assert.deepEqual(read('Receiving objects:  94% (199/211), 45.39 MiB | 4.24 MiB/s'),
-    { detail: 'Downloading Eclipse sources · Better Sunshine Engine (2 of 4) · 45.39 MiB at 4.24 MiB/s', percent: 94 });
-  assert.deepEqual(read('Receiving objects:   3% (7/211)'),
-    { detail: 'Downloading Eclipse sources · Better Sunshine Engine (2 of 4)', percent: 3 });
-  assert.deepEqual(read('Updating files:  50% (94/188)'),
-    { detail: 'Writing Eclipse sources · Better Sunshine Engine (2 of 4)', percent: 50 });
-  assert.deepEqual(read('-- Configuring done'), { detail: 'Getting your game ready', percent: null });
-  assert.deepEqual(read('Receiving objects:  76% (123/160)'), { detail: 'Downloading files', percent: 76 });
-});
-
-test('the Eclipse install shows its download, unpacking and patching', () => {
-  const read = createActivityReader();
-  assert.equal(read('== Eclipse: Super Mario Eclipse v1.1.0 (Eclipse Team)'), null);
-  assert.deepEqual(read('Downloading Super Mario Eclipse v1.1.0 (Eclipse Team)'),
-    { detail: 'Downloading Super Mario Eclipse (about 900 MB)', percent: null });
-  assert.deepEqual(read('Texture download: 446128558/892257115 bytes'),
-    { detail: 'Downloading Super Mario Eclipse · 446.1 MB of 892.3 MB', percent: 50 });
-  assert.deepEqual(read('Checking HD texture download'), { detail: 'Checking the Eclipse download', percent: null });
-  assert.deepEqual(read('Unpacking super_mario_eclipse_v110.7z'),
-    { detail: 'Unpacking Super Mario Eclipse (a few minutes)', percent: null });
-  assert.deepEqual(read('Patching your image (a minute or two)'),
-    { detail: 'Making Super Mario Eclipse from your disc (a few minutes)', percent: null });
-  assert.deepEqual(read('Patching your image: 40%'),
-    { detail: 'Making Super Mario Eclipse from your disc (a few minutes)', percent: 40 });
-  // Other tasks keep their own wording.
-  assert.deepEqual(createActivityReader()('Checking HD texture download'), { detail: 'Checking HD textures', percent: null });
-});
-
 test('a crash is reported as a crash, not as the last warning the game printed', () => {
   // Windows: MSYS bash's report of a native crash, or the exception status itself.
   assert.equal(crashReason(2816, null, 'win32'), 'crashed with a memory access error');
@@ -181,12 +109,3 @@ test('a crash is reported as a crash, not as the last warning the game printed',
     assert.equal(crashReason(code, signal, platform), null);
 });
 
-test('shows decomp patching as progress, which can be slow on some computers', () => {
-  assert.deepEqual(activityFromLine('-- SMS port: applying decomp patches (1/213)'),
-    { detail: "Preparing the game's source · patch 1 of 213", percent: 0 });
-  assert.deepEqual(activityFromLine('-- SMS port: applying decomp patches (213/213)'),
-    { detail: "Preparing the game's source · patch 213 of 213", percent: 100 });
-  for (const invalid of ['-- SMS port: applying decomp patches (5/0)', '-- SMS port: applying decomp patches (9/3)'])
-    assert.equal(activityFromLine(invalid), null);
-  assert.deepEqual(activityFromLine('-- SMS port: 213 decomp patch(es) applied'), null);
-});

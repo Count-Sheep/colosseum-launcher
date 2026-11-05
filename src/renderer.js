@@ -462,7 +462,7 @@ function renderPlayMenu(data) {
   const [kind, label, detail] = prepare ? ['update', 'Prepare & play', `Set up ${name}, then start`]
     : hd ? ['hd', 'Finish HD setup', update && auto ? `Update to${next} and set up HD, then start` : 'Set up HD visuals, then start']
     : update && auto ? ['update', 'Update & play', `Install${next}, then start`]
-      : ['play', 'Play', update ? 'Start without updating' : 'One player'];
+      : ['play', 'Play', update ? 'Start without updating' : 'Start the game'];
   $('menu-default').dataset.kind = kind;
   $('menu-default-label').textContent = label;
   $('menu-default-detail').textContent = detail;

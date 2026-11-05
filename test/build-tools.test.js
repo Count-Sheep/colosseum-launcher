@@ -48,6 +48,26 @@ test('Linux private Make builds a nested CMake project when the tools path conta
   assert.ok(fs.existsSync(path.join(build, 'child', 'passed')));
 });
 
+test('the tools name zig\'s clang, quoted for a path with spaces, on every system', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'colo tools zig-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'env', 'bin'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'msys64'));
+  const linux = tools.environmentAtRoot(root, { PATH: '/usr/bin' }, 'linux');
+  assert.equal(linux.COLO_CLANG, `"${path.join(root, 'env', 'zig', 'zig')}" clang`);
+  assert.equal(linux.COLO_CLANG_INC, `${path.join(root, 'env', 'zig')}/lib/include`);
+  assert.equal(linux.COLO_SDL_INC, path.join(root, 'env', 'include', 'SDL2'));
+  assert.equal(linux.CPATH, path.join(root, 'env', 'include'));
+  assert.equal(linux.LIBRARY_PATH, path.join(root, 'env', 'lib'));
+  const windows = tools.environmentAtRoot(root, { Path: 'C:\\WINDOWS' }, 'win32');
+  assert.match(windows.COLO_CLANG, /^".*zig\/zig\.exe" clang$/);
+  assert.equal(windows.COLO_CLANG.includes('\\'), false);
+  const mac = tools.environmentAtRoot(root, { PATH: '/usr/bin' }, 'darwin');
+  assert.equal(mac.COLO_LLD, path.join(root, 'env', 'bin', 'ld.lld'));
+  assert.equal(mac.COLO_OBJCOPY, path.join(root, 'env', 'bin', 'llvm-objcopy'));
+  assert.equal(mac.COLO_NM, path.join(root, 'env', 'bin', 'llvm-nm'));
+});
+
 test('a corrupt tool archive preserves the existing tools', x64Tools, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sms-tools-test-'));
   try {
@@ -99,7 +119,7 @@ test('Windows tools that lose an executable after setup are no longer ready, and
   assert.equal(tools.missingTools(dir, 'win32'), null);
   assert.equal(tools.deletedToolsError(dir, 'win32'), null);
   const root = installedTools(dir, 'win32');
-  assert.ok(['ninja.exe', 'cmake.exe', 'clang++.exe', 'python.exe', 'g++.exe']
+  assert.ok(['ninja.exe', 'cmake.exe', 'python.exe', 'g++.exe']
     .every(name => fs.existsSync(path.join(root, 'msys64', 'mingw64', 'bin', name))));
   assert.equal(tools.privateReady(dir, 'win32'), true);
   assert.equal(tools.deletedToolsError(dir, 'win32'), null);
@@ -110,9 +130,9 @@ test('Windows tools that lose an executable after setup are no longer ready, and
   const message = tools.deletedToolsError(dir, 'win32').message;
   assert.match(message, /missing ninja\.exe\. Antivirus/);
   assert.ok(message.includes(path.dirname(root)));
-  for (const name of ['cmake.exe', 'clang.exe', 'clang++.exe', 'python.exe', 'gcc.exe'])
+  for (const name of ['cmake.exe', 'g++.exe', 'objcopy.exe', 'python.exe', 'gcc.exe'])
     fs.rmSync(path.join(root, 'msys64', 'mingw64', 'bin', name));
-  assert.match(tools.deletedToolsError(dir, 'win32').message, /missing gcc\.exe, clang\.exe, clang\+\+\.exe, cmake\.exe and 2 more\./);
+  assert.match(tools.deletedToolsError(dir, 'win32').message, /missing gcc\.exe, g\+\+\.exe, objcopy\.exe, cmake\.exe and 2 more\./);
   // Another toolset's files say nothing about this release's.
   fs.writeFileSync(path.join(root, 'ready.json'), JSON.stringify({ toolset: 'older', archiveSha256: tools.assetFor('win32').sha256 }));
   assert.equal(tools.missingTools(dir, 'win32'), null);
@@ -169,7 +189,7 @@ test('setup unpacks tools that lost files again, and names files still missing a
     source: { name: 'tools.tar.gz', sha256: await tools.hashFile(archive) }, run: async () => {},
     progress: (_percent, detail) => details.push(detail) }), error => {
     // Only g++ was in the archive: what's still missing after unpacking is named, for the alert.
-    assert.match(error.message, /^The build tools are missing git, cmake, python3, make and \d+ more\. Then try again\.$/);
+    assert.match(error.message, /^The build tools are missing git, cmake, ninja, python3 and \d+ more\. Then try again\.$/);
     assert.ok(error.missingTools.includes(path.join('env', 'bin', 'cmake')));
     return true;
   });
@@ -195,14 +215,11 @@ test('fallback play can use a recorded older Windows toolset without downloading
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sms-old-tools-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.join(dir, 'msys64'));
-  const env = tools.environmentAtRoot(dir, { PATH: 'existing path', SMS_ARCH: '32' }, 'win32');
-  assert.equal(env.MSYS2_ROOT, path.join(dir, 'msys64'));
-  assert.equal(env.MSYSTEM, 'MINGW32');
-  assert.ok(env.PATH.includes(path.join(dir, 'msys64', 'usr', 'bin')));
-  const current = tools.environmentAtRoot(dir, { PATH: 'existing path', SMS_ARCH: '64' }, 'win32');
+  const current = tools.environmentAtRoot(dir, { PATH: 'existing path' }, 'win32');
+  assert.equal(current.MSYS2_ROOT, path.join(dir, 'msys64'));
   assert.equal(current.MSYSTEM, 'MINGW64');
   assert.ok(current.PATH.startsWith(path.join(dir, 'msys64', 'mingw64', 'bin')));
-  assert.equal(current.PATH.includes(path.join(dir, 'msys64', 'mingw32', 'bin')), false);
+  assert.ok(current.PATH.includes(path.join(dir, 'msys64', 'usr', 'bin')));
 });
 
 test('an explicit COLO_MSYS2_ROOT replaces the bundled Windows tools without downloading them', t => {
@@ -212,7 +229,7 @@ test('an explicit COLO_MSYS2_ROOT replaces the bundled Windows tools without dow
   assert.deepEqual(tools.status(userData, 'win32', {}), { ready: false, mode: 'missing' });
   assert.deepEqual(tools.status(userData, 'win32', { COLO_MSYS2_ROOT: own }), { ready: true, mode: 'own' });
   assert.equal(tools.status(userData, 'linux', { COLO_MSYS2_ROOT: own }).mode, 'missing');
-  const env = tools.environment(userData, { PATH: 'system', SMS_ARCH: '64', COLO_MSYS2_ROOT: own }, 'win32');
+  const env = tools.environment(userData, { PATH: 'system', COLO_MSYS2_ROOT: own }, 'win32');
   assert.equal(env.MSYS2_ROOT, own);
   assert.equal(env.MSYSTEM, 'MINGW64');
   assert.ok(env.PATH.startsWith(`${path.join(own, 'mingw64', 'bin')};${path.join(own, 'usr', 'bin')};`));
@@ -227,14 +244,14 @@ test('Windows build keeps the system Path that a copied environment spells Path'
   fs.mkdirSync(path.join(root, 'msys64', 'usr', 'bin'), { recursive: true });
   fs.writeFileSync(path.join(root, 'msys64', 'usr', 'bin', 'bash.exe'), '');
   // A copy of process.env on Windows, as port.buildEnvironment makes it.
-  const env = tools.environmentAtRoot(root, { Path: 'C:\\WINDOWS\\system32', SMS_ARCH: '64' }, 'win32');
+  const env = tools.environmentAtRoot(root, { Path: 'C:\\WINDOWS\\system32', }, 'win32');
   assert.deepEqual(Object.keys(env).filter(key => key.toUpperCase() === 'PATH'), ['PATH']);
   assert.ok(env.PATH.startsWith(path.join(root, 'msys64', 'mingw64', 'bin')));
   assert.ok(env.PATH.endsWith(';C:\\WINDOWS\\system32'));
   const port = require('../src/port');
-  for (const command of [port.commandFor(root, 'build', [], 'win32', { ...env, Path: 'stale' }),
-    port.commandFor(root, 'build', [], 'win32', { Path: 'C:\\WINDOWS\\system32', MSYS2_ROOT: path.join(root, 'msys64') }),
-    port.commandFor(root, 'run', ['disc.iso'], 'win32', { Path: 'C:\\WINDOWS\\system32', MSYS2_ROOT: path.join(root, 'msys64') })]) {
+  for (const command of [port.buildCommand(root, 'win32', { ...env, Path: 'stale' }),
+    port.buildCommand(root, 'win32', { Path: 'C:\\WINDOWS\\system32', MSYS2_ROOT: path.join(root, 'msys64') }),
+    port.gameRunCommand(root, 'disc.iso', 'win32', { Path: 'C:\\WINDOWS\\system32', MSYS2_ROOT: path.join(root, 'msys64') })]) {
     assert.deepEqual(Object.keys(command.env).filter(key => key.toUpperCase() === 'PATH'), ['PATH']);
     assert.ok(command.env.PATH.endsWith(';C:\\WINDOWS\\system32'));
   }
@@ -248,19 +265,11 @@ test('Windows build tools ignore another Python install\'s environment', t => {
   const host = { Path: 'C:\\WINDOWS\\system32', PYTHONPATH: 'C:\\Python312\\DLLs', PythonHome: 'C:\\Python312',
     PYTHONSTARTUP: 'startup.py', PYTHONUSERBASE: 'C:\\Users\\me\\py', PythonNoUserSite: '', PYTHONUTF8: '1' };
   const python = env => Object.keys(env).filter(key => key.toUpperCase().startsWith('PYTHON')).sort();
-  for (const arch of ['64', '32']) {
-    const env = tools.environmentAtRoot(root, { ...host, SMS_ARCH: arch }, 'win32');
-    assert.deepEqual(python(env), ['PYTHONNOUSERSITE', 'PYTHONUTF8']);
-    assert.equal(env.PYTHONNOUSERSITE, '1');
-    const command = require('../src/port').commandFor(root, 'textures', [], 'win32', env);
-    assert.deepEqual(python(command.env), ['PYTHONNOUSERSITE', 'PYTHONUTF8']);
-  }
-  const cross = path.join(root, 'msys64', 'opt', 'bin', 'i686-w64-mingw32-g++.exe');
-  fs.mkdirSync(path.dirname(cross), { recursive: true });
-  fs.writeFileSync(cross, 'fixture');
-  const env = tools.environmentAtRoot(root, { ...host, SMS_ARCH: '32' }, 'win32');
-  assert.equal(env.SMS_WINDOWS_32_CROSS, '1');
+  const env = tools.environmentAtRoot(root, host, 'win32');
   assert.deepEqual(python(env), ['PYTHONNOUSERSITE', 'PYTHONUTF8']);
+  assert.equal(env.PYTHONNOUSERSITE, '1');
+  const command = require('../src/port').textureCommand(root, 'win32', env);
+  assert.deepEqual(python(command.env), ['PYTHONNOUSERSITE', 'PYTHONUTF8']);
   fs.mkdirSync(path.join(root, 'env'));
   assert.equal(tools.environmentAtRoot(root, { PYTHONPATH: 'kept' }, 'linux').PYTHONPATH, 'kept');
 });
@@ -277,58 +286,22 @@ test('Windows tools give Python a non-empty CA bundle when MinGW\'s shipped empt
   // The 2026-10-05.1 archive: MinGW's bundle is 0 bytes, MSYS2's is complete.
   fs.writeFileSync(mingw, '');
   fs.writeFileSync(usr, '-----BEGIN CERTIFICATE-----\n');
-  const env = tools.environmentAtRoot(root, { Path: 'C:\\WINDOWS\\system32', SMS_ARCH: '64' }, 'win32');
+  const env = tools.environmentAtRoot(root, { Path: 'C:\\WINDOWS\\system32', }, 'win32');
   assert.equal(env.SSL_CERT_FILE, usr);
-  assert.equal(require('../src/port').commandFor(root, 'textures', [], 'win32', env).env.SSL_CERT_FILE, usr);
+  assert.equal(require('../src/port').textureCommand(root, 'win32', env).env.SSL_CERT_FILE, usr);
   // A repaired MinGW bundle is preferred.
   fs.writeFileSync(mingw, '-----BEGIN CERTIFICATE-----\n');
-  assert.equal(tools.environmentAtRoot(root, { SMS_ARCH: '64' }, 'win32').SSL_CERT_FILE, mingw);
+  assert.equal(tools.environmentAtRoot(root, { }, 'win32').SSL_CERT_FILE, mingw);
   // The player's own bundle wins, but not a stale setting naming nothing.
   const own = path.join(root, 'company.pem');
   fs.writeFileSync(own, '-----BEGIN CERTIFICATE-----\n');
-  assert.equal(tools.environmentAtRoot(root, { ssl_cert_file: own, SMS_ARCH: '64' }, 'win32').ssl_cert_file, own);
-  const stale = tools.environmentAtRoot(root, { ssl_cert_file: path.join(root, 'gone.pem'), SMS_ARCH: '64' }, 'win32');
+  assert.equal(tools.environmentAtRoot(root, { ssl_cert_file: own, }, 'win32').ssl_cert_file, own);
+  const stale = tools.environmentAtRoot(root, { ssl_cert_file: path.join(root, 'gone.pem'), }, 'win32');
   assert.deepEqual(Object.keys(stale).filter(key => key.toUpperCase() === 'SSL_CERT_FILE'), ['SSL_CERT_FILE']);
   assert.equal(stale.SSL_CERT_FILE, mingw);
   // Linux and Mac keep their own OpenSSL configuration.
   fs.mkdirSync(path.join(root, 'env'));
   assert.equal(tools.environmentAtRoot(root, {}, 'linux').SSL_CERT_FILE, undefined);
-});
-
-test('32-bit Windows target uses x64 helpers and a cross compiler, with target DLLs first', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sms-cross-tools-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const cross = path.join(root, 'msys64', 'opt', 'bin', 'i686-w64-mingw32-g++.exe');
-  fs.mkdirSync(path.dirname(cross), { recursive: true });
-  fs.writeFileSync(cross, 'fixture');
-  const env = tools.environmentAtRoot(root, { PATH: 'system', SMS_ARCH: '32' }, 'win32');
-  assert.equal(env.MSYSTEM, 'MINGW64');
-  assert.equal(env.SMS_WINDOWS_32_CROSS, '1');
-  assert.equal(env.CXX, cross);
-  assert.equal(env.CMAKE_PREFIX_PATH, path.join(root, 'msys64', 'mingw32'));
-  assert.ok(env.PATH.startsWith(path.join(root, 'msys64', 'opt', 'i686-w64-mingw32', 'bin')));
-  fs.mkdirSync(path.join(root, 'msys64', 'usr', 'bin'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'msys64', 'usr', 'bin', 'bash.exe'), '');
-  const command = require('../src/port').commandFor(root, 'build', [], 'win32', env);
-  assert.equal(command.env.MSYSTEM, 'MINGW64');
-  assert.equal(command.env.PATH, env.PATH);
-});
-
-test('32-bit Linux target selects the private SDK without changing the host helper library path', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sms-cross-tools-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const sdk = path.join(root, 'env', 'targets', 'linux32');
-  fs.mkdirSync(path.join(sdk, 'bin'), { recursive: true });
-  fs.writeFileSync(path.join(sdk, 'bin', 'i686-linux-g++'), 'fixture');
-  const env = tools.environmentAtRoot(root, { PATH: 'system', SMS_ARCH: '32' }, 'linux');
-  assert.equal(env.CXX, path.join(sdk, 'bin', 'i686-linux-g++'));
-  assert.equal(env.SMS_LINUX32_ROOT, sdk);
-  assert.equal(env.LD_LIBRARY_PATH, undefined);
-  assert.ok(env.PATH.startsWith(path.join(root, 'env', 'bin')));
-  assert.ok(env.SMS_LINUX32_LIBRARY_PATH.includes('i386-linux-gnu'));
-  const root64 = tools.environmentAtRoot(root, { SMS_ARCH: '64' }, 'linux');
-  assert.equal(root64.CXX, path.join(root, 'env', 'bin', 'g++'));
-  assert.equal(root64.SMS_LINUX32_ROOT, undefined);
 });
 
 const posixOnly = { skip: process.platform === 'win32' && 'Uses POSIX shell scripts and the system tar.' };
@@ -354,9 +327,9 @@ test('native unpacking counts the files tar names and reports progress', posixOn
 test('Windows tar is given the archive and staging folder by names without the folder above them', () => {
   // Windows' tar.exe gets "?" for an emoji in its arguments, and can't open the archive.
   const folder = 'C:\\Onedrive\\OD Games\\\u{1F3AE} PC Recomps\\Colosseum-Launcher-Portable\\build-tools';
-  const { args, cwd } = tools.nativeUnpackArgs(`${folder}\\sms-build-tools-windows-x64.tar.gz`,
+  const { args, cwd } = tools.nativeUnpackArgs(`${folder}\\colo-build-tools-windows-x64.tar.gz`,
     `${folder}\\.unpack-a1B2c3`, 'msys64', folder, path.win32);
-  assert.deepEqual(args, ['-xvzf', 'sms-build-tools-windows-x64.tar.gz', '-C', '.unpack-a1B2c3', 'msys64']);
+  assert.deepEqual(args, ['-xvzf', 'colo-build-tools-windows-x64.tar.gz', '-C', '.unpack-a1B2c3', 'msys64']);
   assert.equal(cwd, folder);
   assert.ok(args.every(arg => /^[\x20-\x7e]+$/.test(arg)), args.join(' '));
   // An archive chosen from elsewhere keeps its full path.
@@ -477,14 +450,14 @@ test('pruning removes toolsets no kept game uses and interrupted downloads, and 
   make('.unpack-x1y2z3');
   make('notes', 'mine.txt');
   make('windows-x64');
-  fs.writeFileSync(path.join(parent, 'sms-build-tools-linux-x64-2026-10-05.1.tar.gz.part'), 'half a download');
+  fs.writeFileSync(path.join(parent, 'colo-build-tools-linux-x64-2026-10-05.1.tar.gz.part'), 'half a download');
   fs.writeFileSync(path.join(parent, 'readme.txt'), 'mine');
   const errors = [];
   const removed = await tools.pruneToolsets(dir, [path.join(parent, `${id}-bbbbbbbbbbbb`)],
     { platform: 'linux', onError: error => errors.push(error) });
   assert.deepEqual(errors, []);
   assert.deepEqual(removed.map(item => path.basename(item)).sort(), [`.unpack-x1y2z3`, id, `${id}-aaaaaaaaaaaa`,
-    `${id}-aaaaaaaaaaaa.previous-0f8fad5b-d9cb-469f-a165-70867728950e`, 'sms-build-tools-linux-x64-2026-10-05.1.tar.gz.part'].sort());
+    `${id}-aaaaaaaaaaaa.previous-0f8fad5b-d9cb-469f-a165-70867728950e`, 'colo-build-tools-linux-x64-2026-10-05.1.tar.gz.part'].sort());
   assert.deepEqual(fs.readdirSync(parent).sort(), [path.basename(current), `${id}-bbbbbbbbbbbb`, 'notes', 'readme.txt', 'windows-x64'].sort());
   assert.deepEqual(await tools.pruneToolsets(path.join(dir, 'none'), [], { platform: 'linux' }), []);
 });
@@ -531,7 +504,7 @@ test('a step that runs out of disk space says which drive is full instead of bla
   const node = Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
   const hint = tools.outOfSpaceError(node, { dataFolder, gameFolder: `${dataFolder}\\sms-pc-port`, platform: 'win32' });
   assert.equal(hint.message, `Your C: drive (the launcher's data folder, ${dataFolder}) is full (ENOSPC: no space left on device, write). ` +
-    'Free up space on it, then try again: the build tools take a few GB, and HD textures need about 3 GB more. ' +
+    'Free up space on it, then try again: the build tools take a few GB, and HD textures need about 4 GB more. ' +
     'Settings, Manage game, Free up space removes old game versions the launcher no longer uses.');
   assert.doesNotMatch(hint.message, /antivirus/i);
   assert.equal(hint.buildHint, 'disk-full');

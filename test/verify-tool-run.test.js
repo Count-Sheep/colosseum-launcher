@@ -18,7 +18,7 @@ function verify(eclipseConclusion) {
     }] }
   };
   return spawnSync(process.execPath, ['-e', `
-    const fixture = JSON.parse(process.env.SMS_TEST_TOOL_RUN);
+    const fixture = JSON.parse(process.env.COLO_TEST_TOOL_RUN);
     require('node:child_process').execFileSync = (command, args) => {
       if (command !== 'gh') throw new Error('Unexpected command');
       const resource = args.at(-1);
@@ -27,21 +27,14 @@ function verify(eclipseConclusion) {
     };
     require(process.argv[1]);
   `, path.join(__dirname, '..', 'scripts', 'verify-tool-run.js')], {
-    encoding: 'utf8', env: { ...process.env, SMS_TEST_TOOL_RUN: JSON.stringify(fixture),
+    encoding: 'utf8', env: { ...process.env, COLO_TEST_TOOL_RUN: JSON.stringify(fixture),
       COLO_VERIFIED_RUN: '456', COLO_VERIFIED_PLATFORM: 'win32' }
   });
 }
 
-test('publication retry accepts tools whose standard and Eclipse builds passed', () => {
+test('publication retry accepts tools whose build passed', () => {
   const result = verify('success');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Verified win32 tools/);
 });
 
-test('publication retry refuses failed or skipped Eclipse checks even when the job reports success', () => {
-  for (const conclusion of ['failure', 'skipped', undefined]) {
-    const result = verify(conclusion);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /previous win32 compilation check did not succeed/);
-  }
-});

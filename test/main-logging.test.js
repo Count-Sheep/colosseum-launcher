@@ -165,7 +165,16 @@ test('Back up automatically off skips the launcher\'s own backups, with a log li
   fs.mkdirSync(card);
   fs.writeFileSync(path.join(card, 'GMSE01.dat'), 'progress');
   const made = () => fs.existsSync(backups) ? fs.readdirSync(backups).length : 0;
-  runtime.setConfig({ repo: runtime.root, saveDirectory: card, settings: { autoBackups: false } });
+  // the game's card folder, as it finds it: <XDG_DATA_HOME>/colo-port/card-a
+  fs.mkdirSync(path.join(runtime.root, 'data', 'colo-port'), { recursive: true });
+  fs.renameSync(card, path.join(runtime.root, 'data', 'colo-port', 'card-a'));
+  const dataHome = process.env.XDG_DATA_HOME, appData = process.env.APPDATA;
+  process.env.XDG_DATA_HOME = process.env.APPDATA = path.join(runtime.root, 'data');
+  t.after(() => {
+    for (const [key, value] of [['XDG_DATA_HOME', dataHome], ['APPDATA', appData]])
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  });
+  runtime.setConfig({ repo: runtime.root, settings: { autoBackups: false } });
   for (const reason of ['before-play', 'after-play', 'before-port-update', 'before-cleanup'])
     assert.deepEqual({ ...runtime.makeSaveBackup(reason) }, { skipped: true });
   assert.equal(made(), 0);

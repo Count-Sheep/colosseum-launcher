@@ -2,7 +2,7 @@
 
 // A small whole disc: boot header, apploader, main.dol, and a file system
 // table with one file that ends the disc at 0x4000.
-function gcm(id = 'GMSE01', revision = 0, title = 'Super Mario Sunshine') {
+function gcm(id = 'GC6E01', revision = 0, title = 'Pokemon Colosseum') {
   const bytes = Buffer.alloc(0x4000);
   bytes.write(id, 0, 'ascii');
   bytes[7] = revision;

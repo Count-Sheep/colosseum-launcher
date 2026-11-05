@@ -101,31 +101,6 @@ test('GCC gets its DLLs beside it once, and System32 copies of them are reported
   assert.deepEqual(fs.readFileSync(path.join(gccDir, 'libgmp-10.dll')), fs.readFileSync(path.join(bin, 'libgmp-10.dll')));
 });
 
-test('a 32-bit game gets 32-bit runtime DLLs, and SysWOW64 copies are the ones reported', t => {
-  const directory = tempDir(t);
-  const msys = path.join(directory, 'msys64');
-  const settings = { arch: '32' };
-  const env = { MSYS2_ROOT: msys, SMS_WINDOWS_32_CROSS: '1' };
-  const folders = port.gameRuntimeFolders(settings, env);
-  assert.deepEqual(folders, [path.join(msys, 'opt', 'i686-w64-mingw32', 'bin'), path.join(msys, 'mingw32', 'bin')]);
-  assert.deepEqual(port.gameRuntimeFolders({ arch: '64' }, { MSYS2_ROOT: msys }), [path.join(msys, 'mingw64', 'bin')]);
-  // The 64-bit libstdc++ comes first on the search list but does not fit a 32-bit game.
-  const search = [path.join(msys, 'mingw64', 'bin'), ...folders];
-  write(path.join(search[0], 'libstdc++-6.dll'), pe(AMD64));
-  write(path.join(folders[0], 'libstdc++-6.dll'), pe(I386, ['libgcc_s_dw2-1.dll']));
-  write(path.join(folders[0], 'libgcc_s_dw2-1.dll'), pe(I386));
-  write(path.join(folders[1], 'SDL2.dll'), pe(I386));
-  const game = write(path.join(directory, 'game', 'build', 'windows-32', 'sms.exe'), pe(I386, ['SDL2.dll', 'libstdc++-6.dll']));
-  const windows = path.join(directory, 'Windows');
-  write(path.join(windows, 'System32', 'SDL2.dll'), 'a 64-bit copy Windows never gives a 32-bit game');
-  write(path.join(windows, 'SysWOW64', 'libgcc_s_dw2-1.dll'), 'an older copy');
-
-  const result = dlls.shield([game], search, { environment: { SystemRoot: windows } });
-  assert.deepEqual(result.placed.sort(), ['SDL2.dll', 'libgcc_s_dw2-1.dll', 'libstdc++-6.dll']);
-  assert.deepEqual(result.conflicts, [path.join(windows, 'SysWOW64', 'libgcc_s_dw2-1.dll')]);
-  assert.equal(dlls.imports(path.join(path.dirname(game), 'libstdc++-6.dll')).machine, I386);
-});
-
 test('a game that is not a Windows program is left alone', t => {
   const directory = tempDir(t);
   const game = write(path.join(directory, 'build', 'sms.exe'), 'installed executable');
@@ -154,20 +129,19 @@ test('a program misses only the DLLs that are neither beside it, of its own arch
   assert.equal(dlls.unresolved(write(path.join(bin, 'notes.exe'), 'text'), [bin], { environment }), null);
 });
 
-test('a Windows game with its DLLs beside it plays without build tools; elsewhere the game needs them', t => {
+test('a Windows game plays without build tools once nothing it imports is missing; elsewhere the game needs them', t => {
   const game = require('../src/game-version');
   const directory = tempDir(t);
-  const root = path.join(directory, 'sms-pc-port');
-  const settings = port.normalizeSettings({}, 'win32');
-  const binary = port.binaryPath(root, settings, 'win32');
+  const root = path.join(directory, 'game');
+  const binary = port.binaryPath(root, 'win32');
   const windows = path.join(directory, 'Windows');
   write(path.join(windows, 'System32', 'KERNEL32.dll'), pe(AMD64));
   const environment = { SystemRoot: windows };
-  assert.equal(game.playsWithoutTools(root, settings, 'win32', environment), false);
+  assert.equal(game.playsWithoutTools(root, 'win32', environment), false);
   write(binary, pe(AMD64, ['SDL2.dll', 'KERNEL32.dll']));
-  // its SDL2.dll was in the removed tools' mingw64\bin
-  assert.equal(game.playsWithoutTools(root, settings, 'win32', environment), false);
-  write(path.join(path.dirname(binary), 'SDL2.dll'), pe(AMD64, ['KERNEL32.dll']));
-  assert.equal(game.playsWithoutTools(root, settings, 'win32', environment), true);
-  assert.equal(game.playsWithoutTools(root, settings, 'linux', environment), false);
+  // an SDL2.dll from the removed tools' mingw64\\bin
+  assert.equal(game.playsWithoutTools(root, 'win32', environment), false);
+  write(binary, pe(AMD64, ['KERNEL32.dll']));
+  assert.equal(game.playsWithoutTools(root, 'win32', environment), true);
+  assert.equal(game.playsWithoutTools(root, 'linux', environment), false);
 });
