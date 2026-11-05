@@ -298,7 +298,7 @@ function msysBash(environment) {
 // build-colosseum.sh: the decomp's build file once, then the port's build.sh with its dependencies named.
 function buildCommand(root, platform = process.platform, environment = process.env) {
   const script = launcherScript('build-colosseum.sh');
-  if (platform !== 'win32') return { command: 'sh', args: [script, root], cwd: root, env: environment };
+  if (platform !== 'win32') return { command: '/bin/sh', args: [script, root], cwd: root, env: environment };
   const { msys, bash } = msysBash(environment);
   return { command: bash, args: ['-c', 'exec sh "$(cygpath -u "$1")" "$(cygpath -u "$2")"', 'colosseum-launcher', script, root],
     cwd: root, env: msysEnvironment(msys, environment) };

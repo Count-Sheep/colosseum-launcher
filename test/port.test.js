@@ -145,7 +145,7 @@ test('the game is one build, and starts in its folder with the disc named', () =
 
 test('builds run the launcher\'s script, through MSYS2\'s shell on Windows', t => {
   const unix = port.buildCommand('/game', 'linux', {});
-  assert.equal(unix.command, 'sh');
+  assert.equal(unix.command, '/bin/sh');
   assert.equal(path.basename(unix.args[0]), 'build-colosseum.sh');
   assert.equal(unix.args[1], '/game');
   const root = temporary(t);

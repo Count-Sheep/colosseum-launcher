@@ -9,4 +9,4 @@ if [ ! -f "$DECOMP/build.ninja" ]; then
     echo "Preparing the decomp's build"
     (cd "$DECOMP" && python3 configure.py > /dev/null)
 fi
-exec sh "$root/build.sh"
+exec /bin/sh "$root/build.sh"
