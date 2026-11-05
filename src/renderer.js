@@ -382,7 +382,7 @@ function taskName(label) {
 
 function backupReason(reason) {
   return ({ manual: 'Manual backup', 'before-play': 'Before playing', 'after-play': 'After playing',
-    'before-restore': 'Before restoring', 'before-cleanup': 'Before cleanup',
+    'before-restore': 'Before restoring', 'before-dolphin-import': 'Before importing', 'before-cleanup': 'Before cleanup',
     'before-port-update': 'Before update', 'before-tools-change': 'Before changing build tools' })[reason] || 'Backup';
 }
 
@@ -596,6 +596,8 @@ function refresh(data) {
   $('save-path').textContent = `Saved games: ${data.saveDirectory}\nBackups: ${data.backupDirectory}`;
   $('backup-saves').disabled = Boolean(data.active);
   $('restore-saves').disabled = Boolean(data.active) || !data.backups.length;
+  $('import-dolphin-save').disabled = Boolean(data.active);
+  $('dolphin-save-drop').setAttribute('aria-disabled', String(Boolean(data.active)));
   const selectedBackup = $('backup-list').value;
   $('backup-list').replaceChildren(...data.backups.map(backup => {
     const option = document.createElement('option');
@@ -1154,6 +1156,8 @@ async function showWhatsNew() {
   } catch (_) { /* the changelog button still works */ }
 }
 $('changelog-page').addEventListener('click', () => window.colo.openChangelogPage().catch(error => setMessage(errorText(error))));
+// The invite opens in the browser, even while the game builds or runs.
+$('discord').addEventListener('click', () => window.colo.openDiscord().catch(error => setMessage(errorText(error))));
 $('play').addEventListener('click', () => {
   if (wizardStep === 0) runWizardAction('launchGame');
   else if (wizardStep === 1) {
@@ -1173,6 +1177,36 @@ $('restore-saves').addEventListener('click', async () => {
   try { await window.colo.restoreSaves($('backup-list').value); await sync(); }
   catch (error) { showError(error); await sync(); }
 });
+async function importDolphinSave(files) {
+  if (current?.active) return;
+  const resultText = $('dolphin-import-result');
+  resultText.textContent = '';
+  try {
+    const result = await window.colo.importDolphinSave(files);
+    if (result.cancelled) resultText.textContent = 'Import cancelled.';
+    else {
+      const skipped = result.skipped.length ? ` Skipped ${result.skipped.map(save => `${save.file} (${save.reason})`).join(', ')}.` : '';
+      resultText.textContent = `Imported ${result.trainer}'s save from ${result.file}. Start the game to play it.${skipped}`;
+    }
+  } catch (error) { resultText.textContent = errorText(error); }
+  await sync();
+}
+$('import-dolphin-save').addEventListener('click', () => importDolphinSave());
+const dolphinDrop = $('dolphin-save-drop');
+for (const type of ['dragenter', 'dragover']) dolphinDrop.addEventListener(type, event => {
+  event.preventDefault();
+  if (!current?.active) dolphinDrop.classList.add('drag-over');
+});
+for (const type of ['dragleave', 'drop']) dolphinDrop.addEventListener(type, event => {
+  event.preventDefault();
+  dolphinDrop.classList.remove('drag-over');
+});
+dolphinDrop.addEventListener('drop', event => {
+  if (current?.active || !event.dataTransfer.files.length) return;
+  importDolphinSave([...event.dataTransfer.files]);
+});
+// Prevent dropped files from navigating away from the launcher.
+for (const type of ['dragover', 'drop']) window.addEventListener(type, event => event.preventDefault());
 $('open-custom-textures').addEventListener('click', () => window.colo.openCustomTextures().catch(showError));
 for (const key of [...SELECTS, ...SWITCHES]) $(key).addEventListener('change', saveSettings);
 for (const key of ['sharpen', 'brightness']) $(key).addEventListener('input', renderRanges);

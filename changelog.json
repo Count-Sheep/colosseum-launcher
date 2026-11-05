@@ -2,7 +2,9 @@
   "beta": {
     "launcher": [
       "New launcher background: a painted copper engine out in the desert.",
-      "Game updates and rebuilds are much faster: the launcher keeps what it compiled and reuses it. Free up space under Settings, Manage game clears it."
+      "Game updates and rebuilds are much faster: the launcher keeps what it compiled and reuses it. Free up space under Settings, Manage game clears it.",
+      "Import a Dolphin save: drop your North American .gci save on the Saves tab, or the folder it is in, and carry on from there. Your current saves are backed up first.",
+      "Join our Discord server: the Discord button at the top of the launcher opens the invite in your browser."
     ],
     "game": [
       "The first build of the game is faster too."

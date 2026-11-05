@@ -59,6 +59,7 @@ async function renderer(data = state(), copyError = null, notes = { releases: []
     copyActivityLog: async () => { calls.push('copyActivityLog'); if (copyError) throw copyError; },
     saveSettings: async value => { calls.push(['saveSettings', value]); return { ...data, config: { ...data.config, settings: port.normalizeSettings(value, host(data.platform)) } }; },
     changelog: async () => notes, markChangelogSeen: async () => { changelogSeen.push(true); },
+    openDiscord: async () => { calls.push('openDiscord'); },
     play: async () => { calls.push('play'); }, launchGame: async () => { calls.push('launchGame'); },
     removeBuildTools: async () => { calls.push('removeBuildTools'); },
     updateAndPlay: async () => { calls.push('updateAndPlay'); },
@@ -353,6 +354,12 @@ test('nothing new means no popup, and a running task postpones it to the next st
   const busy = await renderer({ ...state(), active: { label: 'Build Pokémon Colosseum', startedAt: Date.now() } }, null, notes);
   assert.equal(busy.elements.get('changelog').hidden, true);
   assert.equal(busy.changelogSeen.length, 0);
+});
+
+test('the Discord button opens the invite', async () => {
+  const ui = await renderer();
+  await ui.click('discord');
+  assert.deepEqual(ui.calls.filter(call => call === 'openDiscord'), ['openDiscord']);
 });
 
 test("the What's new tab lists every release and opens on the newest", async () => {

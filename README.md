@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://discord.gg/pkVwBrSwsZ"><img src="https://invidget.switchblade.xyz/pkVwBrSwsZ" alt="Join the Pokémon Colosseum Port Discord server"></a>
+  <br>
+  <a href="https://discord.gg/pkVwBrSwsZ"><img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
+</p>
+
 # Colosseum Launcher
 
 <img width="1512" height="943" alt="image" src="https://github.com/user-attachments/assets/a513d488-33c6-4249-9792-5fb9c79a0b1b" />
@@ -93,6 +99,8 @@ Beta has the newest launcher and the newest game before they are released, and i
 The launcher keeps your save location when you update or rebuild the game, and makes dated backups before and after playing, and before game updates or cleanup. The memory card is `colo-port/card-a` in your user data folder (`%APPDATA%` on Windows, `~/.local/share` elsewhere).
 
 The **Saves** tab backs up saves, opens the backup folder and restores a backup, backing up your current saves first. Backups are stored in **Colosseum Launcher Backups** in your home folder.
+
+To carry on from a save you played in Dolphin, export it as a `.gci` file (North American version), then drop it on **Import a Dolphin save** in the **Saves** tab. Your current saves are backed up first, and the `.gci` file is left as it is.
 
 ### Privacy
 

@@ -6,6 +6,7 @@ const path = require('node:path');
 const { spawn, execFile } = require('node:child_process');
 const port = require('./port');
 const saves = require('./saves');
+const gciSave = require('./gci-save');
 const buildTools = require('./build-tools');
 const compilerCache = require('./compiler-cache');
 const windowsDlls = require('./windows-dlls');
@@ -24,6 +25,7 @@ const { createSessionLog } = require('./session-log');
 const displayScale = require('./display-scale');
 
 const GAME_NAME = 'Pokémon Colosseum';
+const DISCORD_INVITE = 'https://discord.gg/pkVwBrSwsZ';
 const PLAY_LABEL = `Play ${GAME_NAME}`;
 
 let window;
@@ -1082,6 +1084,31 @@ function registerHandlers() {
   ipcMain.handle('gc-adapter-status', () => gcAdapterStatus());
   ipcMain.handle('gc-adapter-allow', () => allowGcAdapter());
   ipcMain.handle('gc-adapter-copy-command', () => clipboard.writeText(gcAdapter.terminalCommand()));
+  ipcMain.handle('import-dolphin-save', (_event, files) => exclusive('Import Dolphin save', async () => {
+    if (files == null) {
+      const chosen = await dialog.showOpenDialog(window, { title: 'Import Dolphin save',
+        properties: ['openFile', 'multiSelections'], filters: [{ name: 'Dolphin save', extensions: ['gci'] }] });
+      if (chosen.canceled || !chosen.filePaths.length) return { cancelled: true };
+      files = chosen.filePaths;
+    }
+    if (!Array.isArray(files) || !files.length) throw new Error('Choose a Dolphin .gci save file.');
+    const { file, converted, skipped } = gciSave.readGciFiles(files);
+    const directory = currentSaveDirectory();
+    const existing = fs.existsSync(path.join(directory, `${converted.name}.dat`));
+    const party = converted.party.length ? `\nParty: ${converted.party.join(', ')}` : '';
+    const skippedNote = skipped.length ? `\n\nSkipping ${skipped.map(save => `${save.file} (${save.reason})`).join(', ')}.` : '';
+    const warning = converted.damaged ? `\n\nThe newest ${converted.damaged === 1 ? 'copy' : `${converted.damaged} copies`} of this save could not be read, so the game will load the one before. Your most recent progress may be missing.` : '';
+    const answer = await dialog.showMessageBox(window, {
+      type: existing || warning ? 'warning' : 'question',
+      buttons: ['Cancel', 'Import save'], defaultId: 0, cancelId: 0,
+      message: existing ? `Replace your ${converted.title} save with this Dolphin save?` : `Import this ${converted.title} save from Dolphin?`,
+      detail: `${path.basename(file)}\nTrainer: ${converted.trainer}${party}${skippedNote}\n\nDestination: ${directory}\n\nYour current memory card will be backed up first. The original .gci file is kept.${warning}`
+    });
+    if (answer.response !== 1) return { cancelled: true };
+    const result = gciSave.importGci(converted, directory);
+    log(`Imported Dolphin ${converted.title} save into ${directory}.${result.previous ? ` Previous saves: ${result.previous}` : ''}`);
+    return { ...result, trainer: converted.trainer, party: converted.party, file: path.basename(file), skipped };
+  }));
   ipcMain.handle('restore-saves', async (_event, id) => {
     if (operation || active) throw new Error('Stop the running game or task before restoring saves.');
     if (!saves.listBackups().some(item => item.id === id && item.source === currentSaveDirectory()))
@@ -1133,6 +1160,8 @@ function registerHandlers() {
   ipcMain.handle('changelog', () => changelogState());
   ipcMain.handle('changelog-seen', () => markChangelogSeen());
   ipcMain.handle('open-changelog-page', () => shell.openExternal(changelog.PAGE_URL));
+  // Only this fixed invite opens: the page never chooses a URL.
+  ipcMain.handle('open-discord', () => shell.openExternal(DISCORD_INVITE));
 }
 
 function windowState(target) {

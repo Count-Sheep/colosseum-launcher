@@ -143,5 +143,5 @@ function moveBuildKeepingSaves(buildDirectory, destination, saveDir, backups = b
   return backup;
 }
 
-module.exports = { saveDirectory, gameDataEnvironment, backupRoot, cleanupWouldRemoveSaves, backupSaves, listBackups, backupFolder,
+module.exports = { saveDirectory, gameDataEnvironment, backupRoot, cleanupWouldRemoveSaves, cardFiles: saveFiles, backupSaves, listBackups, backupFolder,
   restoreBackup, moveBuildKeepingSaves };

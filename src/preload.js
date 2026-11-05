@@ -1,5 +1,5 @@
 'use strict';
-const { contextBridge, ipcRenderer, webFrame } = require('electron');
+const { contextBridge, ipcRenderer, webFrame, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('colo', {
   state: () => ipcRenderer.invoke('state'),
@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld('colo', {
   gcAdapterStatus: () => ipcRenderer.invoke('gc-adapter-status'),
   allowGcAdapter: () => ipcRenderer.invoke('gc-adapter-allow'),
   copyGcAdapterCommand: () => ipcRenderer.invoke('gc-adapter-copy-command'),
+  importDolphinSave: files => {
+    const filePaths = files ? Array.from(files, file => webUtils.getPathForFile(file)) : null;
+    if (filePaths?.some(filePath => !filePath)) throw new Error('Drop .gci files from your computer.');
+    return ipcRenderer.invoke('import-dolphin-save', filePaths);
+  },
   restoreSaves: id => ipcRenderer.invoke('restore-saves', id),
   openBackups: () => ipcRenderer.invoke('open-backups'),
   showPathFolder: () => ipcRenderer.invoke('show-path-folder'),
@@ -38,6 +43,7 @@ contextBridge.exposeInMainWorld('colo', {
   changelog: () => ipcRenderer.invoke('changelog'),
   markChangelogSeen: () => ipcRenderer.invoke('changelog-seen'),
   openChangelogPage: () => ipcRenderer.invoke('open-changelog-page'),
+  openDiscord: () => ipcRenderer.invoke('open-discord'),
   checkAppUpdate: () => ipcRenderer.invoke('check-app-update'),
   installAppUpdate: () => ipcRenderer.invoke('install-app-update'),
   zoomFactor: () => webFrame.getZoomFactor(),

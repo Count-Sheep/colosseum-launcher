@@ -380,6 +380,13 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .path-row .backup-picker { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; margin: 0; }
 .backup-picker span { flex: none; }
 .backup-progress { display: grid; gap: 10px; padding: 0 0 12px; }
+.dolphin-save-drop { padding: 16px; border: 2px dashed #c79bbd; border-radius: 14px; background: #fbf4f9; }
+.dolphin-save-drop.drag-over { border-color: #8a0f6f; background: #f6e3f1; }
+.dolphin-save-drop[aria-disabled="true"] { opacity: .55; }
+.dolphin-save-drop .helper { display: block; margin: 4px 0 10px; }
+#dolphin-import-result:not(:empty) { display: block; margin-top: 10px; }
+.dark .dolphin-save-drop { border-color: #77395d; background: #3e152a; }
+.dark .dolphin-save-drop.drag-over { border-color: #d283c8; background: #4b1d35; }
 .dark :is(.backup-progress-none, .backup-progress-empty) { color: #b295a9; }
 .settings-group > .small-path { min-height: 0; margin: 0; padding: 14px 0 2px; }
 .settings-group > .version-list { margin: 0; padding: 4px 0; }
@@ -495,6 +502,9 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .topbar-chip ~ .platform-pill { margin-left: 0; }
 .topbar-dot { width: 7px; height: 7px; border-radius: 50%; background: #ffc75a; }
 .topbar-dot[hidden] { display: none; }
+.topbar-discord { display: grid; place-items: center; width: 34px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: #5865f2; -webkit-app-region: no-drag; }
+.topbar-discord:hover { background: #6d78f5; }
+.topbar-discord svg { width: 18px; height: 18px; fill: #fff; }
 
 /* Status bar: a task's progress, and the button that opens the activity log on any page. */
 .status-progress { flex: none; width: 90px; height: 4px; overflow: hidden; border-radius: 4px; background: #ffffff30; }
