@@ -239,15 +239,21 @@ index 35aab70..51d59c1 100644
  L = [re.sub(r'(?<![\w$])([A-Za-z]):/', r'\1$:/', l) if l.startswith('build ') else l for l in L]
  open(P + '/build/build.ninja', 'w').write('\n'.join(L) + '\n')
 diff --git a/tools/link.py b/tools/link.py
-index 14937c9..10b3d45 100644
+index 14937c9..41ec653 100644
 --- a/tools/link.py
 +++ b/tools/link.py
-@@ -66,11 +66,14 @@ def sh(cmd, **kw):
+@@ -66,11 +66,20 @@ def sh(cmd, **kw):
      if r.returncode: sys.stderr.write(r.stdout + r.stderr); raise SystemExit('failed: %s' % (cmd if isinstance(cmd, str) else ' '.join(cmd))[:300])
      return r.stdout
  
 +# a response file's arguments, quoted: a path can hold a space
 +def rsp(args): return '\n'.join('"%s"' % a.replace('\\', '\\\\').replace('"', '\\"') for a in args)
++
++def cache_report():
++    if os.path.exists(B + '/unit-cache.log'):
++        log = open(B + '/unit-cache.log', 'rb').read()
++        print('unit cache: %d of %d steps reused' % (log.count(b'h'), len(log)))
++        os.remove(B + '/unit-cache.log')
 +
  # ---- host objects
  HOST_C = sorted(glob.glob(P + '/host/*.c'))
@@ -258,7 +264,7 @@ index 14937c9..10b3d45 100644
  INC = ['-I' + P + '/host', '-I' + SMSGX + '/include', '-I' + SMSGX + '/src', '-I' + SMSGX + '/port_include',
         '-I' + SMS_SRC + '/port_include', '-I' + SMS + '/decomp/include',
         '-I' + SMS + '/decomp/libs/dolphin/include', '-I' + SMS_SRC, '-I' + SDL_INC,
-@@ -128,13 +131,26 @@ if not os.path.exists(ver) or open(ver).read() != open(redef).read(): open(ver,
+@@ -128,13 +137,26 @@ if not os.path.exists(ver) or open(ver).read() != open(redef).read(): open(ver,
  list(ThreadPoolExecutor(os.cpu_count() or 4).map(objcopy, objs))
  
  # ---- symbols
@@ -287,7 +293,7 @@ index 14937c9..10b3d45 100644
          for l in out.splitlines():
              parts = l.split()
              if len(parts) >= 3 and len(parts[-2]) == 1:
-@@ -142,7 +158,7 @@ def nm(paths, macho=False, where=None):
+@@ -142,7 +164,7 @@ def nm(paths, macho=False, where=None):
                  if t == 'U': u.add(n)
                  elif t in 'TWDBRCVGS' or (macho and t == 'I') or (t in 'tdbr' and n.startswith('colo.')):
                      d.setdefault(n, t)
@@ -296,7 +302,7 @@ index 14937c9..10b3d45 100644
              elif len(parts) == 2 and parts[0] == 'U': u.add(name(parts[1]))
              elif len(parts) >= 2 and parts[-2] == 'U': u.add(name(parts[-1]))
      return d, u
-@@ -183,8 +199,13 @@ elif MAC:
+@@ -183,8 +205,13 @@ elif MAC:
          for blk in re.findall(r'symbols:\s*\[([^\]]*)\]', t):
              for s in re.findall(r"'?_([A-Za-z0-9_$.]+)'?", blk): libc.add(s)
  else:
@@ -312,7 +318,7 @@ index 14937c9..10b3d45 100644
              p = l.split()
              if len(p) >= 3: libc.add(p[2].split('@')[0])
  
-@@ -292,7 +313,7 @@ if WIN:
+@@ -292,7 +319,7 @@ if WIN:
  else:
      cmd = ['g++', '-no-pie', '-o', out, '-Wl,-Ttext-segment=0x20000000', '-Wl,--no-warn-rwx-segments', '-Wl,--allow-multiple-definition', '-rdynamic', WRAP] + host_objs + gen_objs + objs + \
            GX_LIBS + [L + '/syms.ld', '-lSDL2', '-lEGL', '-ldl', '-lpthread', '-lm']
@@ -321,16 +327,13 @@ index 14937c9..10b3d45 100644
  r = subprocess.run(['g++', '@' + L + '/cmd.rsp'], capture_output=True, text=True)
  errs = r.stderr
  open(L + '/link.log', 'w').write(errs)
-@@ -302,3 +323,7 @@ if r.returncode:
+@@ -302,3 +329,4 @@ if r.returncode:
      print('\n'.join(lines[:40]))
      raise SystemExit(1)
  print('linked', out)
-+if os.path.exists(B + '/unit-cache.log'):
-+    log = open(B + '/unit-cache.log', 'rb').read()
-+    print('unit cache: %d of %d steps reused' % (log.count(b'h'), len(log)))
-+    os.remove(B + '/unit-cache.log')
++cache_report()
 diff --git a/tools/link_macos.py b/tools/link_macos.py
-index b0370a3..7ba1c07 100644
+index b0370a3..a4a97d7 100644
 --- a/tools/link_macos.py
 +++ b/tools/link_macos.py
 @@ -46,10 +46,10 @@ def link(g):
@@ -365,6 +368,11 @@ index b0370a3..7ba1c07 100644
      r = subprocess.run(g['HOSTCXX'] + ['@' + L + '/cmd.rsp'], capture_output=True, text=True)
      errs = '\n'.join(l for l in r.stderr.splitlines() if '-no_pie is deprecated' not in l)
      open(L + '/link.log', 'w').write(errs)
+@@ -179,3 +179,4 @@ def link(g):
+     # an ad-hoc signature (the linker's is invalidated by nothing here, but keep it valid)
+     subprocess.run(['codesign', '-s', '-', '-f', EXE], capture_output=True)
+     print('linked', EXE)
++    g['cache_report']()
 diff --git a/tools/remirror.sh b/tools/remirror.sh
 index 3878800..8218cf5 100755
 --- a/tools/remirror.sh

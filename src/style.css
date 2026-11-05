@@ -110,7 +110,7 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 @media (max-width: 920px) { .topbar { gap: 14px; padding: 0 18px; } .viewport, .statusbar { padding-left: 18px; padding-right: 18px; } .brand { min-width: 160px; } .tab { padding: 0 9px; } }
 @media (prefers-reduced-motion: reduce) { .spinner, .progress-track.indeterminate #progress-fill, .status-icon.checking svg { animation-duration: 3s; } }
 
-/* The supplied seaside artwork is the launch screen's full-window backdrop. */
+/* The supplied desert painting is the launch screen's full-window backdrop. */
 :root { background: #420d2b; }
 .shell {
   background:

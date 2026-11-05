@@ -127,6 +127,9 @@ function environment(env, program, { userData, root, platform = process.platform
       CCACHE_BASEDIR: native(path.resolve(root)),
       // Debug information would name the build folder.
       CCACHE_NOHASHDIR: '1',
+      // Half the renderer's objects use a precompiled header (glslang's), which ccache leaves uncached without these.
+      // The header files of each version are new, so their times say nothing: their contents are what count.
+      CCACHE_SLOPPINESS: 'pch_defines,time_macros,include_file_mtime,include_file_ctime',
       // Apple's clang is reached through a wrapper, which stays the same when Xcode updates the compiler.
       ...(platform === 'darwin' ? { CCACHE_COMPILERCHECK: '%compiler% --version' } : {})
     } : {})

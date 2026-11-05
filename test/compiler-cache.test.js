@@ -127,6 +127,7 @@ test('a build\'s cache settings: shared across game versions, without the player
   assert.equal(env.CMAKE_CXX_COMPILER_LAUNCHER, path.join(userData, 'compiler-cache', 'bin', 'ccache'));
   assert.equal(env.CMAKE_C_COMPILER_LAUNCHER, path.join(userData, 'compiler-cache', 'bin', 'ccache'));
   assert.equal(env.COLO_UNIT_CACHE, path.join(userData, 'compiler-cache', 'units'));
+  assert.match(env.CCACHE_SLOPPINESS, /pch_defines/);
   assert.equal(env.CCACHE_DIR, path.join(userData, 'compiler-cache', 'files'));
   assert.equal(env.CCACHE_CONFIGPATH, path.join(userData, 'compiler-cache', 'ccache.conf'));
   // the game folder being built, not above it: the build tools' paths stay whole
