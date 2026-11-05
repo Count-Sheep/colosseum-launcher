@@ -89,7 +89,7 @@ The **Saves** tab backs up saves, opens the backup folder and restores a backup,
 
 ### Privacy
 
-The launcher sends nothing about you. It talks to GitHub and the port's GitLab for updates, the setup files and the HD textures, and your disc image never leaves your computer.
+The launcher sends nothing about you. It talks to GitHub and the port's GitLab for updates and the setup files, and to Amazon S3 for the HD textures. Your disc image never leaves your computer.
 
 ## Need help?
 
