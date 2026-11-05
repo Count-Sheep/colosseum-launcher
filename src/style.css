@@ -518,3 +518,27 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .dark .segment { color: #b295a9; }
 .dark .segment:hover { color: #f3e7f0; }
 .dark .segment.active { background: #501f39; color: #ffe2a3; }
+
+/* Game source (Manage game) and its note under Play */
+#game-source summary { cursor: pointer; list-style: none; }
+#game-source summary::-webkit-details-marker { display: none; }
+#game-source summary h2 { display: inline; }
+#game-source summary small { margin-left: 6px; color: #856c7e; font-size: 11px; font-weight: 500; }
+#game-source summary::after { content: '›'; float: right; color: #856c7e; transition: transform .15s; }
+#game-source[open] summary::after { transform: rotate(90deg); }
+.source-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px 12px; margin-top: 10px; }
+.source-grid label { display: flex; flex-direction: column; gap: 4px; color: #5e4257; font-size: 12px; }
+.source-grid input { width: 100%; padding: 7px 10px; border: 1px solid #dcd4dd; border-radius: 7px; background: #fff; color: #3e2436; font: inherit; font-size: 12px; }
+.source-grid input:focus-visible { outline: 2px solid #841d74; outline-offset: 2px; }
+.source-group { margin-top: 12px; padding: 14px 16px; }
+#game-source summary h2 { font-size: 13px; }
+#game-source > .helper { display: block; margin-top: 8px; }
+.dark #game-source summary small, .dark #game-source summary::after { color: #b295a9; }
+.dark :is(.settings-group > .row-note.lead, .binding-row, .source-grid label, .changelog-headline, .changelog-details, .changelog-version, .controls-note p, .field) { color: #e0cada; }
+.dark :is(select, .source-grid input, .binding-keys kbd, .mp-input) { border-color: #673651; background: #341123; color: #f1e4ed; }
+.play-source { display: flex; align-items: center; gap: 7px; width: max-content; max-width: 100%; margin: 10px auto 0; padding: 3px 11px; border: 1px solid #ffce6d73; border-radius: 999px; background: #ffce6d1f; color: #ffe2a3; font-size: 11.5px; cursor: pointer; }
+.play-source:hover { background: #ffce6d33; }
+.play-source-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #ffce6d; }
+.play-source strong { font-weight: 700; }
+.play-source span:last-child { overflow: hidden; color: #ffe2a3cc; font: 600 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.play-source span:last-child:empty { display: none; }

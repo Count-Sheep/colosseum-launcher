@@ -60,6 +60,7 @@ function showSettingsTab(name) {
   }
   $('settings-panes').scrollTop = 0;
   if (name === 'controls') { renderBindings(); loadGcAdapter(); }
+  if (name === 'launcher') loadUpdateChannels();
 }
 for (const tab of settingsTabs) $(`tab-${tab}`).addEventListener('click', () => showSettingsTab(tab));
 onPage('settings', {
@@ -609,6 +610,11 @@ function refresh(data) {
   $('renderer-field').hidden = !(platform.renderers || []).includes('vulkan');
   renderExclusiveResolutions(config.settings.exclusiveResolution);
   renderDisplays(config.settings.display);
+  renderUpdateChannels(config.settings.updateChannel);
+  // Portable launchers update by downloading a new .exe, so channels do not apply.
+  $('update-channel-field').hidden = data.portable;
+  $('update-channel-note').hidden = data.portable;
+  renderGameSource(data);
   for (const key of SELECTS) $(key).value = String(config.settings[key]);
   renderRanges();
   for (const key of SWITCHES) $(key).checked = config.settings[key];
@@ -631,8 +637,76 @@ function refresh(data) {
 
 // The settings that are a list or a range, and the ones that are a switch: each saves under its element's id.
 const SELECTS = ['widescreen', 'resolution', 'frameRate', 'vsync', 'fullscreenMode', 'exclusiveResolution', 'display', 'msaa', 'anisotropic',
-  'sharpen', 'brightness', 'aspect', 'presentFilter', 'fsrMode', 'textureLoading', 'renderer', 'hdText', 'padMode'];
+  'sharpen', 'brightness', 'aspect', 'presentFilter', 'fsrMode', 'textureLoading', 'renderer', 'hdText', 'padMode', 'updateChannel'];
 const SWITCHES = ['fullscreen', 'hudEdges', 'skipMovies', 'overlay', 'backgroundInput', 'fxaa', 'textures', 'shaderWarmup', 'autoUpdate', 'autoBackups', 'darkMode'];
+
+let updateChannels = [{ id: 'stable', label: 'Stable' }];
+function renderUpdateChannels(chosen) {
+  const list = updateChannels.some(item => item.id === chosen) ? updateChannels
+    : updateChannels.concat({ id: chosen, label: chosen, missing: true });
+  $('updateChannel').replaceChildren(...list.map(item => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.missing ? `${item.label} (no longer available)` : item.label;
+    if (item.detail) option.title = item.detail;
+    return option;
+  }));
+  $('updateChannel').value = chosen;
+}
+async function loadUpdateChannels() {
+  try { updateChannels = await window.colo.updateChannels(); }
+  catch (_) { return; }
+  if (current) { changing = true; renderUpdateChannels(current.config.settings.updateChannel); changing = false; }
+}
+
+const sourceFields = { port: ['source-port-repository', 'source-port-ref'], decomp: ['source-decomp-repository', 'source-decomp-ref'] };
+let sourceShown = false;
+function renderGameSource(data) {
+  const chosen = data.gameSource;
+  // Fill the fields from the saved choice once, so typing is never overwritten.
+  if (!sourceShown) {
+    sourceShown = true;
+    for (const [part, [repository, ref]] of Object.entries(sourceFields)) {
+      $(repository).value = chosen?.override[part]?.repository || '';
+      $(ref).value = chosen?.override[part]?.ref || '';
+    }
+    $('game-source').open = Boolean(chosen);
+  }
+  $('game-source-note').textContent = chosen
+    ? `Building from ${chosen.version}. Update game to build it, or to follow a branch's newest commit.`
+    : `Using this launcher's release (game ${data.game.availableVersion}).`;
+  for (const id of ['apply-game-source', 'reset-game-source', ...Object.values(sourceFields).flat()])
+    $(id).disabled = Boolean(data.active);
+  $('reset-game-source').hidden = !chosen;
+  // Under Play, so nobody plays a chosen source thinking it is this launcher's release.
+  const ref = chosen?.override?.port?.ref || chosen?.override?.decomp?.ref || '';
+  const commit = String(chosen?.version || '').replace(/^custom /, '');
+  $('play-source').hidden = !chosen;
+  $('play-source-detail').textContent = [ref, commit !== ref && commit].filter(Boolean).join(' · ');
+}
+
+function gameSourceValue() {
+  const value = {};
+  for (const [part, [repository, ref]] of Object.entries(sourceFields))
+    value[part] = { repository: $(repository).value, ref: $(ref).value };
+  return value;
+}
+async function setGameSource(value) {
+  setMessage('');
+  try { refresh(await window.colo.setGameSource(value)); }
+  catch (error) { showError(error); }
+}
+$('apply-game-source').addEventListener('click', () => setGameSource(gameSourceValue()));
+$('play-source').addEventListener('click', () => {
+  showPage('settings');
+  showSettingsTab('manage');
+  $('game-source').open = true;
+  $('game-source').scrollIntoView({ block: 'center' });
+});
+$('reset-game-source').addEventListener('click', () => {
+  for (const id of Object.values(sourceFields).flat()) $(id).value = '';
+  setGameSource(null);
+});
 
 async function sync() { refresh(await window.colo.state()); }
 
@@ -1122,7 +1196,7 @@ function renderAppUpdate(value) {
   $('install-app-update').hidden = value.state !== 'ready';
   $('check-updates').disabled = checkingUpdates || value.state === 'checking' || value.state === 'downloading';
 }
-// Check for a launcher update now, then reread the game's versions.
+// Check the launcher's update channel now, then reread the game's versions and the channel list.
 async function checkForUpdates() {
   if (checkingUpdates) return;
   checkingUpdates = true;
@@ -1130,7 +1204,7 @@ async function checkForUpdates() {
   $('check-updates').classList.add('checking');
   try {
     await window.colo.checkAppUpdate();
-    await sync();
+    await Promise.all([sync(), loadUpdateChannels()]);
   } catch (error) { showError(error); }
   finally {
     checkingUpdates = false;

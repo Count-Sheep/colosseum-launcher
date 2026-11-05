@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('colo', {
   copyMacCommand: index => ipcRenderer.invoke('copy-mac-command', index),
   saveSettings: value => ipcRenderer.invoke('save-settings', value),
   chooseRom: () => ipcRenderer.invoke('choose-rom'),
+  setGameSource: value => ipcRenderer.invoke('set-game-source', value),
+  updateChannels: () => ipcRenderer.invoke('update-channels'),
   chooseRepo: () => ipcRenderer.invoke('choose-repo'),
   chooseLocation: () => ipcRenderer.invoke('choose-location'),
   installPort: () => ipcRenderer.invoke('install-port'),

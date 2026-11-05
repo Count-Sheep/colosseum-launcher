@@ -1,4 +1,23 @@
 {
   "toolset": "2026-11-05.1",
-  "platforms": {}
+  "platforms": {
+    "x64": {
+      "toolset": "2026-11-05.1",
+      "name": "colo-build-tools-macos-x64-2026-11-05.1.tar.gz",
+      "url": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-macos-x64-2026-11-05.1/colo-build-tools-macos-x64-2026-11-05.1.tar.gz",
+      "sha256": "bfa1a7e3c6d692d8baa334719b766685f388aa70e5504317c2f84f75b4608019",
+      "size": 329906681,
+      "sources": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-macos-x64-2026-11-05.1/colo-build-tools-macos-x64-2026-11-05.1-sources.tar.gz",
+      "notices": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-macos-x64-2026-11-05.1/colo-build-tools-macos-x64-2026-11-05.1-NOTICES.md"
+    },
+    "arm64": {
+      "toolset": "2026-11-05.1",
+      "name": "colo-build-tools-macos-arm64-2026-11-05.1.tar.gz",
+      "url": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-macos-arm64-2026-11-05.1/colo-build-tools-macos-arm64-2026-11-05.1.tar.gz",
+      "sha256": "c41e005a4bdf64adfb1473de44f52a5cef78cd1a8fdbc195390e2acaf8c7c475",
+      "size": 313729882,
+      "sources": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-macos-arm64-2026-11-05.1/colo-build-tools-macos-arm64-2026-11-05.1-sources.tar.gz",
+      "notices": "https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-macos-arm64-2026-11-05.1/colo-build-tools-macos-arm64-2026-11-05.1-NOTICES.md"
+    }
+  }
 }

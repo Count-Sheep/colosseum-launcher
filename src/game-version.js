@@ -150,7 +150,8 @@ async function checkout(root, { git = 'git', run, capture, env, source = release
   const temporary = `${root}.download-${crypto.randomUUID()}`;
   try {
     await shallowCheckout(temporary, source.repository, source.commit, 'port source', tools);
-    if (source.portPatch)
+    // A chosen source, or a newer port, may have these changes already.
+    if (source.portPatch && !fs.readFileSync(path.join(temporary, 'tools', 'link.py'), 'utf8').includes('def nm_file('))
       await run(git, ['apply', '--whitespace=nowarn', portPatchFile(source)], { cwd: temporary, env }, 'Prepare port source');
     const { decomp, renderer } = port.dependencyPaths(temporary);
     await shallowCheckout(decomp, source.decompRepository, source.decomp, 'decomp source', tools);

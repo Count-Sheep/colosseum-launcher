@@ -206,7 +206,7 @@ function driveName(folder, platform) {
 }
 
 // The error to show for a step that ran out of disk space, or null. It names the
-// launcher's data folder (where the build tools, compiler cache and, by default,
+// launcher's data folder (where the build tools, and, by default,
 // the game go) and the game folder when that is on another drive.
 function outOfSpaceError(error, { dataFolder, gameFolder, platform = process.platform } = {}) {
   if (error?.buildHint || !outOfSpace(error)) return null;

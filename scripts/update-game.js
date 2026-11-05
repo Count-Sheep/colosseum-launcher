@@ -11,6 +11,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const current = require('../src/game-release.json');
+const { pinned, rendererHeaders } = require('./game-pins');
 const ref = process.argv[2] || `origin/${current.branch}`;
 const launcherRoot = path.join(__dirname, '..');
 const previousLauncher = require('../package.json').version;
@@ -36,25 +37,6 @@ function addChangelogEntry(version, game, previousCommit) {
   fs.writeFileSync(file, `${JSON.stringify(changelog, null, 2)}\n`);
 }
 
-// A value the port's CI script pins: NAME=value at the start of a line.
-function pinned(script, name) {
-  const value = script.match(new RegExp(`^${name}=(\\S+)`, 'm'))?.[1];
-  if (!value) throw new Error(`The port's tools/ci/linux-build.sh does not pin ${name}.`);
-  return value;
-}
-
-function submoduleCommit(repository, commit) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'colo-renderer-'));
-  const run = args => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
-  try {
-    run(['init', '-q']);
-    run(['fetch', '-q', '--depth', '1', '--filter=blob:none', repository, commit]);
-    const decomp = run(['ls-tree', commit, 'decomp']).match(/^160000 commit ([a-f0-9]{40})\tdecomp$/)?.[1];
-    if (!decomp) throw new Error('The renderer revision does not pin its decomp submodule.');
-    return { decomp, url: run(['show', `${commit}:.gitmodules`]).match(/path = decomp\s+url = (\S+)/)?.[1] };
-  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
-}
-
 try {
   git(['clone', '--filter=blob:none', '--no-checkout', '--branch', current.branch, current.repository, '.']);
   const commit = git(['rev-parse', '--verify', `${ref}^{commit}`]);
@@ -64,11 +46,11 @@ try {
   if (commit === current.commit && decomp === current.decomp && renderer === current.renderer.commit) {
     console.log('This game revision is already selected. No release bump needed.');
   } else {
-    const headers = submoduleCommit(current.renderer.repository, renderer);
+    const headers = rendererHeaders(current.renderer.repository, renderer);
     const date = new Date().toISOString().slice(0, 10).replaceAll('-', '.');
     const number = current.version.startsWith(`${date}.`) ? Number(current.version.split('.').at(-1)) + 1 : 1;
     const next = { ...current, version: `${date}.${number}`, commit, decomp,
-      renderer: { ...current.renderer, commit: renderer, decomp: headers.decomp, decompRepository: headers.url || current.renderer.decompRepository } };
+      renderer: { ...current.renderer, commit: renderer, decomp: headers.decomp, decompRepository: headers.decompRepository || current.renderer.decompRepository } };
     fs.writeFileSync(path.join(launcherRoot, 'src', 'game-release.json'), `${JSON.stringify(next, null, 2)}\n`);
     execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['version', 'patch', '--no-git-tag-version'],
       { cwd: launcherRoot, stdio: 'inherit', shell: process.platform === 'win32' });

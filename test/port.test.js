@@ -179,6 +179,13 @@ test('a Windows folder too deep to build in is found before the build, with what
   assert.match(portable.message, /Colosseum-Launcher-Portable/);
 });
 
+test('launcher updates stay on Stable unless a known channel is chosen', () => {
+  assert.equal(port.normalizeSettings({}).updateChannel, 'stable');
+  assert.equal(port.normalizeSettings({ updateChannel: 'beta' }).updateChannel, 'beta');
+  assert.equal(port.normalizeSettings({ updateChannel: 'pr-12' }).updateChannel, 'pr-12');
+  assert.equal(port.normalizeSettings({ updateChannel: 'nightly' }).updateChannel, 'stable');
+});
+
 test('a playable install is the one with a game built', t => {
   const root = temporary(t);
   assert.equal(port.playableInstall({ repo: root, settings: {} }), null);

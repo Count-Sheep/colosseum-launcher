@@ -62,6 +62,8 @@ async function renderer(data = state(), copyError = null, notes = { releases: []
     play: async () => { calls.push('play'); }, launchGame: async () => { calls.push('launchGame'); },
     removeBuildTools: async () => { calls.push('removeBuildTools'); },
     updateAndPlay: async () => { calls.push('updateAndPlay'); },
+    updateChannels: async () => [{ id: 'stable', label: 'Stable' }, { id: 'beta', label: 'Beta' }],
+    setGameSource: async value => { calls.push(['setGameSource', value]); return data; },
     prepareGame: async () => {
       calls.push('prepareGame'); Object.assign(data, { binaryReady: true, hdVisualsReady: true }); data.game = { ...data.game, needsUpdate: false, installedVersion: data.game.availableVersion };
     },
@@ -446,6 +448,34 @@ test('the tabs show one page at a time and mark it', async () => {
     assert.equal(ui.elements.get(nav)['aria-current'], 'page');
   }
   assert.equal(ui.elements.get('settings-cog').classList.contains('active'), false);
+});
+
+test('the launcher update channel is listed, saved with the others, and hidden for the portable launcher', async () => {
+  const data = state(), ui = await renderer(data);
+  await ui.click('settings-cog');
+  await ui.click('tab-launcher');
+  await new Promise(setImmediate);
+  assert.equal(Boolean(ui.elements.get('update-channel-field').hidden), false);
+  ui.elements.get('updateChannel').value = 'beta';
+  ui.elements.get('updateChannel').dispatch('change');
+  await new Promise(setImmediate);
+  assert.equal(ui.calls.at(-1)[1].updateChannel, 'beta');
+  const portable = state();
+  portable.portable = true;
+  assert.equal((await renderer(portable)).elements.get('update-channel-field').hidden, true);
+});
+
+test('a chosen game source shows under Play and on Manage game, and can be set back', async () => {
+  const data = state();
+  data.gameSource = { override: { port: { repository: 'https://example.invalid/fork.git', ref: 'fix' }, decomp: null }, version: 'custom abc1234' };
+  const ui = await renderer(data);
+  assert.equal(ui.elements.get('play-source').hidden, false);
+  assert.match(ui.elements.get('play-source-detail').textContent, /fix · abc1234/);
+  assert.equal(ui.elements.get('source-port-repository').value, 'https://example.invalid/fork.git');
+  assert.match(ui.elements.get('game-source-note').textContent, /Building from custom abc1234/);
+  await ui.click('reset-game-source');
+  assert.deepEqual(ui.calls.at(-1), ['setGameSource', null]);
+  assert.equal((await renderer()).elements.get('play-source').hidden, true);
 });
 
 test('the Renderer list is saved with the others, Vulkan by default', async () => {

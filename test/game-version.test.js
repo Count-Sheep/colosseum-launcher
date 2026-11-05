@@ -188,8 +188,8 @@ function repository(home, name, files) {
   return { url: `file://${directory}`, first };
 }
 
-function sourceFrom(home) {
-  const port_ = repository(home, 'port', { 'build.sh': '', 'run.sh': '', 'tools/befix.py': '' });
+function sourceFrom(home, portFiles = {}) {
+  const port_ = repository(home, 'port', { 'build.sh': '', 'run.sh': '', 'tools/befix.py': '', 'tools/link.py': '# the link\n', ...portFiles });
   const decomp = repository(home, 'decomp', { 'configure.py': '' });
   const renderer = repository(home, 'renderer', { 'src/port.h': '' });
   const headers = repository(home, 'headers', { 'include/dolphin.h': '' });
@@ -230,6 +230,17 @@ test('the launcher\'s patch is applied to the port it pins, and a changed patch 
   const before = game.identity(undefined, undefined, { ...pinned, portPatch: 'test.patch' }).portPatch;
   fs.appendFileSync(patch, '+more\n');
   assert.notEqual(game.identity(undefined, undefined, { ...pinned, portPatch: 'test.patch' }).portPatch, before);
+});
+
+test('a port that already has the launcher\'s changes keeps them, and is not patched again', { skip: process.platform === 'win32' }, async t => {
+  const home = folder(t, 'colo checkout-');
+  const pinned = sourceFrom(home, { 'tools/link.py': 'def nm_file(line): pass\n' });
+  fs.writeFileSync(path.join(home, 'test.patch'), 'this would not apply\n');
+  port.useLauncherScripts(home);
+  t.after(() => port.useLauncherScripts(null));
+  const root = path.join(home, 'game');
+  await game.checkout(root, { ...runner(process.env), source: { ...pinned, portPatch: 'test.patch' } });
+  assert.equal(port.isPort(root), true);
 });
 
 test('this release\'s patch applies to the port commit it pins', () => {

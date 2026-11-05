@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const bindings = require('./bindings');
+const { normalizeChannel } = require('./update-channel');
 const { prependWindowsPath } = require('./windows-path');
 const { describe } = require('./disc');
 
@@ -124,6 +125,7 @@ function normalizeSettings(input = {}, platform = process.platform) {
     shaderWarmup: input.shaderWarmup !== false,
     renderer: choiceSetting(input.renderer, info.renderers, 'vulkan'),
     autoUpdate: input.autoUpdate !== false,
+    updateChannel: normalizeChannel(input.updateChannel),
     // Save backups the launcher makes by itself (before and after play, before updates and cleanup).
     autoBackups: input.autoBackups !== false,
     darkMode: Boolean(input.darkMode),

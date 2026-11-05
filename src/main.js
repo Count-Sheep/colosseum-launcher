@@ -9,6 +9,8 @@ const saves = require('./saves');
 const buildTools = require('./build-tools');
 const windowsDlls = require('./windows-dlls');
 const game = require('./game-version');
+const updateChannel = require('./update-channel');
+const gameSource = require('./game-source');
 const gcAdapter = require('./gc-adapter');
 const appImageUpdate = require('./appimage-update');
 const bindings = require('./bindings');
@@ -20,8 +22,6 @@ const { observeProcess, exitDescription, failureMessage } = require('./process-o
 const { createSessionLog } = require('./session-log');
 const displayScale = require('./display-scale');
 
-// Where launcher releases come from.
-const REPOSITORY = { owner: 'chasem-dev', repo: 'colosseum-launcher' };
 const GAME_NAME = 'Pokémon Colosseum';
 const PLAY_LABEL = `Play ${GAME_NAME}`;
 
@@ -110,7 +110,47 @@ app.on('child-process-gone', (_event, details) => {
   log(`Launcher ${details.type} process ${details.reason}: ${exitDescription(details.name || details.type, details.exitCode, null)}`);
 });
 
-function currentSource() { return game.release; }
+// A game source chosen under Settings, with the commits it resolved to.
+function savedGameSource(saved) {
+  try {
+    const override = gameSource.normalizeOverride(saved?.override);
+    const resolved = saved?.resolved;
+    if (!override || !/^[a-f0-9]{40}$/.test(resolved?.commit) || !/^[a-f0-9]{40}$/.test(resolved?.decomp) ||
+      !/^[a-f0-9]{40}$/.test(resolved?.renderer?.commit)) return null;
+    return { override, resolved: { ...resolved, custom: true, override } };
+  } catch (_) { return null; }
+}
+
+function currentSource() { return config.gameSource?.resolved || game.release; }
+
+async function chooseGameSource(input) {
+  await ensureBuildTools();
+  const override = gameSource.normalizeOverride(input);
+  if (!override) {
+    config.gameSource = null;
+    saveConfig();
+    log(`Game source: this launcher release (${game.release.version}). Update game to switch back.`);
+    return state();
+  }
+  const resolved = await gameSource.resolve(override, { capture, env: toolEnv() });
+  config.gameSource = { override, resolved };
+  saveConfig();
+  log(`Game source: ${resolved.repository} at ${resolved.commit.slice(0, 12)}, decomp ${resolved.decompRepository || 'pinned by it'} at ${resolved.decomp.slice(0, 12)}. Update game to build it.`);
+  return state();
+}
+
+// Update game follows a chosen branch to its newest commit.
+async function refreshGameSource() {
+  if (!config.gameSource) return;
+  try {
+    const resolved = await gameSource.resolve(config.gameSource.override, { capture, env: toolEnv() });
+    if (resolved.commit !== config.gameSource.resolved.commit || resolved.decomp !== config.gameSource.resolved.decomp) {
+      config.gameSource = { ...config.gameSource, resolved };
+      saveConfig();
+      log(`Game source moved to ${resolved.version}.`);
+    }
+  } catch (error) { log(`Could not check the chosen game source for changes: ${error.message}`); }
+}
 
 function configFile() { return path.join(app.getPath('userData'), 'preferences.json'); }
 
@@ -134,8 +174,11 @@ function loadConfig() {
     installRoot: typeof saved.installRoot === 'string' ? saved.installRoot : null,
     previousInstall: saved.previousInstall || null,
     completedSetup: Boolean(saved.completedSetup),
+    gameSource: savedGameSource(saved.gameSource),
     // The newest launcher version whose changelog the player has been shown.
-    changelogSeen: changelog.baseVersion(saved.changelogSeen)
+    changelogSeen: changelog.baseVersion(saved.changelogSeen),
+    // Which wording of Beta's notes a Beta build last showed.
+    changelogBetaSeen: /^[a-f0-9]{16}$/.test(saved.changelogBetaSeen) ? saved.changelogBetaSeen : null
   };
   for (const root of [config.repo, config.previousInstall?.repo].filter(Boolean)) {
     try { if (game.recoverBuild(root)) log('Recovered your previous game after interrupted setup.'); }
@@ -452,11 +495,15 @@ async function prepareBuildTools() {
 async function updatePort() {
   requireRepo();
   port.validateRom(config.rom);
+  // Removed build tools download again only for a game that needs building.
+  if (config.gameSource || !game.isCurrent(config.repo, currentSource())) {
+    await ensureBuildTools();
+    await refreshGameSource();
+  }
   if (game.isCurrent(config.repo, currentSource())) {
-    log('Your game is up to date for this launcher release.');
+    log(config.gameSource ? 'Your game is up to date with the chosen game source.' : 'Your game is up to date for this launcher release.');
     return state();
   }
-  await ensureBuildTools();
   await build();
   return state();
 }
@@ -618,6 +665,18 @@ async function setupGame() {
   return state();
 }
 
+// The Play menu's Update only / Prepare only: everything Play would do first, then stay in the launcher.
+// A chosen game source moves to its newest commit first, as Update game does.
+async function prepareGame() {
+  requireRepo();
+  port.validateRom(config.rom);
+  if (config.gameSource) {
+    await ensureBuildTools();
+    await refreshGameSource();
+  }
+  return setupGame();
+}
+
 // Changed keys go to a file of the launcher's own, so a bindings.txt kept by hand in the game folder is left alone.
 function bindingsEnvironment(settings) {
   if (!Object.keys(settings.keyBindings || {}).length && !Object.keys(settings.padBindings || {}).length) return {};
@@ -720,6 +779,7 @@ function state() {
     texturePack: { size: port.TEXTURE_PACK.size, unpacked: port.TEXTURE_PACK.unpacked },
     binaryReady: ready,
     tools: toolsStatus(),
+    gameSource: config.gameSource ? { override: config.gameSource.override, version: config.gameSource.resolved.version } : null,
     game: { launcherVersion: app.getVersion(), availableVersion: currentSource().version,
       installedVersion: installedBuild?.gameVersion || null,
       installedToolVersion: installedBuild?.toolVersion || null,
@@ -731,15 +791,44 @@ function state() {
   };
 }
 
+// Stable never sees a pre-release. Beta and pull request previews are opt-in,
+// and may be older than what is installed, so leaving one can go back down.
+function applyUpdateChannel() {
+  if (!updater) return;
+  const channel = config.settings.updateChannel;
+  const url = process.env.COLO_LAUNCHER_UPDATE_URL;
+  updater.setFeedURL(url ? { provider: 'generic', url } : updateChannel.feedFor(channel));
+  updater.channel = 'latest';
+  updater.allowPrerelease = channel !== 'stable';
+  updater.allowDowngrade = channel !== 'stable' || app.getVersion().includes('-');
+}
+
 async function checkAppUpdate() {
   if (!updater) return appUpdate;
   try { await updater.checkForUpdates(); }
   catch (error) {
-    appUpdate = { state: 'error', message: `Launcher update check failed: ${error.message}` };
+    const missing = config.settings.updateChannel !== 'stable' && /\b404\b/.test(error.message);
+    appUpdate = { state: 'error', message: missing
+      ? `${updateChannel.channelLabel(config.settings.updateChannel)} is no longer available. Choose another update channel in Settings.`
+      : `Launcher update check failed: ${error.message}` };
     broadcast('app-update', appUpdate);
     log(appUpdate.message);
   }
   return appUpdate;
+}
+
+async function updateChannels() {
+  let releases = null;
+  try {
+    const response = await net.fetch(`https://api.github.com/repos/${updateChannel.REPOSITORY}/releases?per_page=100`,
+      { headers: { Accept: 'application/vnd.github+json' } });
+    if (response.ok) releases = await response.json();
+  } catch (_) { /* offline: Stable, Beta and the current choice are still offered */ }
+  const channels = updateChannel.channelsFromReleases(releases);
+  const chosen = config.settings.updateChannel;
+  if (!channels.some(item => item.id === chosen))
+    channels.push({ id: chosen, label: updateChannel.channelLabel(chosen), detail: 'No longer available', missing: true });
+  return channels;
 }
 
 let releaseNotes = null;
@@ -762,21 +851,29 @@ async function loadChangelog() {
   }
 }
 
+let betaShown = null;
 async function changelogState() {
-  const { releases } = await loadChangelog();
+  const { releases, beta } = await loadChangelog();
   const options = { current: app.getVersion(), returning: config.completedSetup };
+  betaShown = changelog.isBeta(app.getVersion()) ? beta : null;
   return { releases, current: changelog.baseVersion(app.getVersion()),
-    unseen: changelog.unseen(releases, { ...options, seen: config.changelogSeen }).map(release => release.version), beta: null };
+    unseen: changelog.unseen(releases, { ...options, seen: config.changelogSeen }).map(release => release.version),
+    beta: betaShown && { ...betaShown, unseen: changelog.unseenBeta(betaShown, { ...options, seen: config.changelogBetaSeen }) } };
 }
 
-// The release only moves forward.
+// The release only moves forward, so leaving a preview for an older release
+// and coming back does not repeat notes already shown.
 function markChangelogSeen() {
   const version = changelog.baseVersion(app.getVersion());
-  if (!version || (config.changelogSeen && changelog.compareVersions(version, config.changelogSeen) <= 0)) return;
-  config.changelogSeen = version;
+  const betaKey = changelog.betaKey(betaShown);
+  const newer = version && (!config.changelogSeen || changelog.compareVersions(version, config.changelogSeen) > 0);
+  if (!newer && (!betaKey || betaKey === config.changelogBetaSeen)) return;
+  if (newer) config.changelogSeen = version;
+  if (betaKey) config.changelogBetaSeen = betaKey;
   saveConfig();
 }
 
+// Development runs stay out of the numbers unless pointed at a test API.
 function setupAppUpdater() {
   const url = process.env.COLO_LAUNCHER_UPDATE_URL;
   const bundledFeed = fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'));
@@ -785,7 +882,7 @@ function setupAppUpdater() {
     appUpdate = portable.updateNotice(app.getVersion(), null);
     const check = async () => {
       try {
-        const response = await net.fetch(`https://api.github.com/repos/${REPOSITORY.owner}/${REPOSITORY.repo}/releases/latest`,
+        const response = await net.fetch(`https://api.github.com/repos/${updateChannel.REPOSITORY}/releases/latest`,
           { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(8000) });
         if (response.ok) {
           const before = appUpdate.state;
@@ -810,7 +907,7 @@ function setupAppUpdater() {
   if (process.platform === 'linux') appImageUpdate.keepAppImagePath(updater);
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
-  updater.setFeedURL(url ? { provider: 'generic', url } : { provider: 'github', ...REPOSITORY });
+  applyUpdateChannel();
   const set = (state, message) => {
     appUpdate = { state, message }; broadcast('app-update', appUpdate);
     if (state !== 'downloading' || !message.startsWith('Downloading launcher update:')) log(message);
@@ -881,10 +978,18 @@ function registerHandlers() {
   });
   ipcMain.handle('save-settings', async (_event, input) => {
     if (operation || active) throw new Error('Finish the current task before changing settings.');
-    config.settings = port.normalizeSettings(input);
+    const settings = port.normalizeSettings(input);
+    const channelChanged = settings.updateChannel !== config.settings.updateChannel;
+    config.settings = settings;
     saveConfig();
+    if (channelChanged) {
+      applyUpdateChannel();
+      log(`Launcher updates now follow ${updateChannel.channelLabel(settings.updateChannel)}.`);
+      checkAppUpdate();
+    }
     return state();
   });
+  ipcMain.handle('update-channels', () => updateChannels());
   ipcMain.handle('choose-rom', async () => {
     if (operation || active) throw new Error('Finish the current task before changing game files.');
     const chosen = await dialog.showOpenDialog(window, {
@@ -927,7 +1032,7 @@ function registerHandlers() {
   });
   const actions = { 'install-port': ['Download port source', installPort],
     'update-port': ['Update game', updatePort], 'install-textures': ['Install HD textures', () => installTextures()], 'build': ['Build game', () => build(true)],
-    'setup-game': ['Build game', setupGame], 'prepare-game': ['Prepare game', setupGame], 'play': [PLAY_LABEL, playInstalled],
+    'setup-game': ['Build game', setupGame], 'prepare-game': ['Prepare game', prepareGame], 'play': [PLAY_LABEL, playInstalled],
     'launch-game': ['Prepare game', () => launchGame()], 'update-and-play': ['Prepare game', () => launchGame(true)],
     'play-previous': [PLAY_LABEL, () => {
       if (!config.previousInstall) throw new Error('There is no previous version available.');
@@ -935,6 +1040,7 @@ function registerHandlers() {
     }] };
   for (const [channel, [label, callback]] of Object.entries(actions))
     ipcMain.handle(channel, () => exclusive(label, callback, ['play', 'launch-game', 'update-and-play', 'play-previous'].includes(channel)));
+  ipcMain.handle('set-game-source', (_event, input) => exclusive('Choose game source', () => chooseGameSource(input)));
   ipcMain.handle('clean-preview', () => exclusive('Preview cleanup', () => clean(true)));
   ipcMain.handle('backup-saves', () => exclusive('Back up saves', () => makeSaveBackup('manual')));
   ipcMain.handle('gc-adapter-status', () => gcAdapterStatus());
