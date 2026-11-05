@@ -4,7 +4,9 @@
       "Battle animations: play moves, send-outs and HP bars at 4× or 8× speed, or skip them. Find it under Gameplay."
     ],
     "game": [
-      "Battle animations can run at 4× or 8× speed or be skipped, with menus at normal speed and text up long enough to read."
+      "Battle animations can run at 4× or 8× speed or be skipped, with menus at normal speed and text up long enough to read.",
+      "Building the game on Linux and macOS is faster: its code now compiles once instead of twice.",
+      "Fixed new builds on Linux and macOS leaving out small corrections to battle and menu code that only a rebuild picked up."
     ]
   },
   "releases": [
