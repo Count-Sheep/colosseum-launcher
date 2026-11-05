@@ -243,6 +243,29 @@ test('a port that already has the launcher\'s changes keeps them, and is not pat
   assert.equal(port.isPort(root), true);
 });
 
+test('only a port that reads the C library from Debian\'s directory gets the launcher\'s C library patch', { skip: process.platform === 'win32' }, async t => {
+  const debian = "for lib in ['/lib/x86_64-linux-gnu/libc.so.6']:\n";
+  t.after(() => port.useLauncherScripts(null));
+  const checkedOut = async link => {
+    const home = folder(t, 'colo checkout-');
+    fs.writeFileSync(path.join(home, 'test.patch'), ['--- a/build.sh', '+++ b/build.sh', '@@ -0,0 +1 @@', '+patched', ''].join('\n'));
+    fs.writeFileSync(path.join(home, 'port-launcher-libc.patch'), ['--- a/tools/link.py', '+++ b/tools/link.py', '@@ -1 +1 @@', `-${debian.trim()}`, '+found', ''].join('\n'));
+    port.useLauncherScripts(home);
+    const root = path.join(home, 'game');
+    await game.checkout(root, { ...runner(process.env), source: { ...sourceFrom(home, { 'tools/link.py': link }), portPatch: 'test.patch' } });
+    assert.equal(fs.readFileSync(path.join(root, 'build.sh'), 'utf8'), 'patched\n');
+    return fs.readFileSync(path.join(root, 'tools', 'link.py'), 'utf8');
+  };
+  assert.equal(await checkedOut(debian), 'found\n');
+  assert.equal(await checkedOut('gcc finds it\n'), 'gcc finds it\n');
+});
+
+test('the C library patch ships with the launcher', () => {
+  const packaged = require('../package.json').build.extraResources[0].filter;
+  assert.ok(packaged.includes('port-launcher-libc.patch'));
+  assert.ok(fs.statSync(path.resolve(__dirname, '..', 'scripts', 'port-launcher-libc.patch')).size > 0);
+});
+
 test('this release\'s patch applies to the port commit it pins', () => {
   assert.equal(source.branch, 'master');
   assert.ok(fs.statSync(path.resolve(__dirname, '..', 'scripts', source.portPatch)).size > 0);

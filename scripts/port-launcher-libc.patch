@@ -1,0 +1,19 @@
+diff --git a/tools/link.py b/tools/link.py
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -205,8 +205,13 @@ elif MAC:
+         for blk in re.findall(r'symbols:\s*\[([^\]]*)\]', t):
+             for s in re.findall(r"'?_([A-Za-z0-9_$.]+)'?", blk): libc.add(s)
+ else:
+-    for lib in ['/lib/x86_64-linux-gnu/libc.so.6', '/lib/x86_64-linux-gnu/libm.so.6']:
+-        for l in subprocess.run(['nm', '-D', '--defined-only', lib], capture_output=True, text=True).stdout.splitlines():
++    # the libraries this compiler links with, wherever the system or a private toolchain keeps them
++    for name in ('libc.so.6', 'libm.so.6'):
++        lib = subprocess.run(['gcc', '-print-file-name=' + name], capture_output=True, text=True).stdout.strip()
++        if not os.path.isabs(lib): lib = '/lib/x86_64-linux-gnu/' + name
++        out = subprocess.run(['nm', '-D', '--defined-only', lib], capture_output=True, text=True).stdout
++        if not out: raise SystemExit('no symbols read from ' + lib)   # else every C library call would become a stub
++        for l in out.splitlines():
+             p = l.split()
+             if len(p) >= 3: libc.add(p[2].split('@')[0])
+ 

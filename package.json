@@ -32,7 +32,8 @@
         "filter": [
           "build-colosseum.sh",
           "install-textures.py",
-          "port-launcher.patch"
+          "port-launcher.patch",
+          "port-launcher-libc.patch"
         ]
       }
     ],

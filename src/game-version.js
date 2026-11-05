@@ -44,9 +44,24 @@ function gitRevision(root) {
 // repository is only read. Its hash is part of what a build is made from, so a changed patch builds again.
 function portPatchFile(source = release) { return source.portPatch ? port.launcherScript(source.portPatch) : null; }
 
+// Beta builds the port's newest commit with the same patch as the pinned one, so what they disagree on is kept
+// apart: older ports read the C library from Debian's directory and need this too, newer ones find it themselves.
+// Remove it once the pinned commit no longer has DEBIAN_LIBC.
+const LIBC_PATCH = 'port-launcher-libc.patch';
+const DEBIAN_LIBC = "'/lib/x86_64-linux-gnu/libc.so.6'";
+
 function patchHash(source = release) {
   const file = portPatchFile(source);
-  return file ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+  if (!file) return null;
+  const hash = crypto.createHash('sha256').update(fs.readFileSync(file));
+  return hash.update(fs.readFileSync(port.launcherScript(LIBC_PATCH))).digest('hex');
+}
+
+async function patchPort(directory, source, { git, run, env }) {
+  const apply = file => run(git, ['apply', '--whitespace=nowarn', file], { cwd: directory, env }, 'Prepare port source');
+  await apply(portPatchFile(source));
+  const link = path.join(directory, 'tools', 'link.py');
+  if (fs.existsSync(link) && fs.readFileSync(link, 'utf8').includes(DEBIAN_LIBC)) await apply(port.launcherScript(LIBC_PATCH));
 }
 
 // What a game version is made from: the port, the decomp it compiles and the renderer's sources (with the
@@ -152,7 +167,7 @@ async function checkout(root, { git = 'git', run, capture, env, source = release
     await shallowCheckout(temporary, source.repository, source.commit, 'port source', tools);
     // A chosen source, or a newer port, may have these changes already.
     if (source.portPatch && !fs.existsSync(path.join(temporary, 'tools', 'unit_cache.py')))
-      await run(git, ['apply', '--whitespace=nowarn', portPatchFile(source)], { cwd: temporary, env }, 'Prepare port source');
+      await patchPort(temporary, source, tools);
     const { decomp, renderer } = port.dependencyPaths(temporary);
     await shallowCheckout(decomp, source.decompRepository, source.decomp, 'decomp source', tools);
     await shallowCheckout(renderer, source.renderer.repository, source.renderer.commit, 'renderer source', tools);
