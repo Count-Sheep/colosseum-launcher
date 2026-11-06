@@ -14,7 +14,8 @@
       "Fixed Poké Ball catch rates on Linux and macOS.",
       "Fixed the blue background on the main menus and save screen stopping short of the sides in widescreen.",
       "Fixed the PC menus leaving black bars at the sides in widescreen.",
-      "Fixed the game crashing when entering a new area after playing for a long time."
+      "Fixed the game crashing when entering a new area after playing for a long time.",
+      "Fixed Rui getting stuck walking on the spot when you first enter the mayor's house in Phenac City, and people stalling the same way in other cutscenes."
     ]
   },
   "releases": [
