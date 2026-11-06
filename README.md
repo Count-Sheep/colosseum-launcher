@@ -1,4 +1,6 @@
 <p align="center">
+  <a href="https://github.com/chasem-dev/colosseum-launcher/releases/latest"><img src="docs/download-button.svg" alt="Download Colosseum Launcher from the latest release"></a>
+  <br>
   <a href="https://discord.gg/pkVwBrSwsZ"><img src="docs/discord-card.svg" alt="Join the Pokémon Colosseum Port Discord server"></a>
   <br>
   <a href="https://discord.gg/pkVwBrSwsZ"><img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
@@ -123,6 +125,15 @@ The launcher sends nothing about you. It talks to GitHub and the port's GitLab f
 ## Need help?
 
 Open the activity log with **Activity log** in the status bar, choose **Copy log**, and [open an issue](https://github.com/chasem-dev/colosseum-launcher/issues/new/choose) with it. Crash reports are kept in `colo-port/crashes` in your state folder (`%LOCALAPPDATA%` on Windows, `~/.local/state` elsewhere).
+
+## Credits
+
+| | Who | For |
+| --- | --- | --- |
+| <img src="https://github.com/chasem-dev.png?size=96" width="48" height="48" alt=""> | **[Chase Myers](https://github.com/chasem-dev)** | The launcher and the PC port |
+| <img src="https://github.com/snatcherLeo.png?size=96" width="48" height="48" alt=""> | **[snatcherLeo](https://github.com/snatcherLeo)** | Engine expertise |
+| <img src="https://github.com/dougchansan.png?size=96" width="48" height="48" alt=""> | **[dougchansan](https://github.com/dougchansan)** | The [pkmn-colosseum](https://github.com/dougchansan/pkmn-colosseum) decompilation the game is built from |
+| <img src="https://github.com/SteamGridDB.png?size=96" width="48" height="48" alt=""> | **[SteamGridDB](https://www.steamgriddb.com)** | The artwork used by **Add to Steam** |
 
 ## For developers
 
