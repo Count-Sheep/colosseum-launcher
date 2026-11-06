@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const bindings = require('./bindings');
+const presets = require('./presets');
 const { normalizeChannel } = require('./update-channel');
 const { prependWindowsPath } = require('./windows-path');
 const { describe } = require('./disc');
@@ -142,6 +143,8 @@ function normalizeSettings(input = {}, platform = process.platform) {
     // Controller rumble in percent: 0 turns it off.
     rumbleStrength: numberSetting(input.rumbleStrength, 100, 0, 100)
   };
+  // The graphics preset chosen (src/presets.js), while the picture settings still match it; else Custom.
+  settings.graphicsPreset = presets.reconcile({ ...settings, graphicsPreset: input.graphicsPreset });
   return settings;
 }
 

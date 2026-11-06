@@ -4,6 +4,8 @@ const $ = id => document.getElementById(id);
 let current;
 let changing = false;
 let wizardStep = null;
+// The failure of a game `--play` started, shown once when the launcher opens instead.
+let directPlayShown = null;
 let setupPending = false;
 const GAME_LABEL = 'Play Pokémon Colosseum';
 const activityLog = window.coloActivityLog.createActivityLog();
@@ -620,6 +622,10 @@ function refresh(data) {
   for (const key of SELECTS) $(key).value = String(config.settings[key]);
   renderRanges();
   for (const key of SWITCHES) $(key).checked = config.settings[key];
+  $('graphicsPreset').value = config.settings.graphicsPreset || 'custom';
+  renderPreset();
+  renderCrashReports(data.crashReports);
+  if (data.directPlayFailure && data.directPlayFailure !== directPlayShown) setMessage(directPlayShown = data.directPlayFailure, true);
   renderTheme();
   keyBindings = config.settings.keyBindings || {};
   padBindings = config.settings.padBindings || {};
@@ -632,7 +638,7 @@ function refresh(data) {
   for (const key of ['stickDeadzone', 'triggerClick', 'rumbleStrength']) $(key).disabled = Boolean(data.active);
   if (!capture) renderBindings();
   $('reset-bindings').disabled = Boolean(data.active);
-  for (const key of [...SELECTS, ...SWITCHES]) $(key).disabled = Boolean(data.active);
+  for (const key of [...SELECTS, ...SWITCHES, 'graphicsPreset']) $(key).disabled = Boolean(data.active);
   renderDependents(Boolean(data.active));
   changing = false;
 }
@@ -883,7 +889,8 @@ function renderDependents(busy = false) {
 
 function settingsValue() {
   const value = { keyBindings, padBindings, stickDeadzone: Number($('stickDeadzone').value),
-    triggerClick: Number($('triggerClick').value), rumbleStrength: Number($('rumbleStrength').value) };
+    triggerClick: Number($('triggerClick').value), rumbleStrength: Number($('rumbleStrength').value),
+    graphicsPreset: $('graphicsPreset').value };
   for (const key of SELECTS) value[key] = $(key).value;
   for (const key of SWITCHES) value[key] = $(key).checked;
   return value;
@@ -1158,8 +1165,144 @@ async function showWhatsNew() {
 $('changelog-page').addEventListener('click', () => window.colo.openChangelogPage().catch(error => setMessage(errorText(error))));
 // The invite opens in the browser, even while the game builds or runs.
 $('discord').addEventListener('click', () => window.colo.openDiscord().catch(error => setMessage(errorText(error))));
+// --- Graphics presets (src/presets.js). Choosing one sets its picture settings; the settings
+// file keeps the choice only while they still match it (port.js), so a change by hand shows Custom.
+if (globalThis.ColoPresets) $('graphicsPreset').replaceChildren(...ColoPresets.CHOICES.map(({ id, label }) => {
+  const option = document.createElement('option'); option.value = id; option.textContent = label; return option;
+}));
+function renderPreset() {
+  if (!globalThis.ColoPresets) return;
+  $('graphicsPreset-detail').textContent = ColoPresets.CHOICES.find(choice => choice.id === $('graphicsPreset').value)?.detail || '';
+}
+$('graphicsPreset').addEventListener('change', () => {
+  const preset = globalThis.ColoPresets && ColoPresets.find($('graphicsPreset').value);
+  if (preset) for (const [key, value] of Object.entries(preset.values)) {
+    if (typeof value === 'boolean') $(key).checked = value;
+    else $(key).value = String(value);
+  }
+  renderRanges();
+  renderDependents();
+  renderPreset();
+  saveSettings();
+});
+
+function renderCrashReports({ count, newest, folder }) {
+  $('crash-reports-note').textContent = count
+    ? `${count === 1 ? 'One report' : `${count} reports`} from the game, the newest from ${new Date(newest).toLocaleString()}. They stay on this computer until you share one.`
+    : `None so far. If the game crashes, its report is saved in ${folder}.`;
+  $('copy-crash-report').disabled = !count;
+}
+$('copy-crash-report').addEventListener('click', async () => {
+  try { await window.colo.copyCrashReport(); $('crash-report-result').textContent = 'Copied.'; }
+  catch (error) { showError(error); }
+});
+$('open-crash-reports').addEventListener('click', () => window.colo.openCrashReports().catch(showError));
+
+// Steam, the banner on Play: Add to Steam while the launcher can add
+// itself and is not in the library yet, then a tick once it is there. Selecting
+// the tick updates the shortcut's artwork and Skip Launcher. A shortcut made by
+// hand without --no-sandbox, which won't open in Game Mode, shows a fix instead.
+const STEAM_DETAIL = $('steam-banner-detail').textContent;
+let steam = {};
+function steamBannerText() {
+  if (steam.needsFix) return { title: 'Fix for Game Mode', mark: '!', detail: steam.available
+    ? "Steam's shortcut is missing --no-sandbox. Select to fix it" : 'In Steam, add --no-sandbox to its launch options' };
+  if (steam.inSteam) return { title: 'In your Steam library', mark: '✓', detail: steam.available
+    ? 'Select to update its artwork or Skip Launcher' : 'Play from Steam, Big Picture or Game Mode' };
+  return { title: 'Add to Steam', mark: '+', detail: STEAM_DETAIL };
+}
+function renderSteamBanner() {
+  const banner = $('add-to-steam'), text = steamBannerText();
+  banner.hidden = !steam.available && !steam.inSteam;
+  banner.classList.toggle('in-steam', Boolean(steam.inSteam) && !steam.needsFix);
+  banner.classList.toggle('needs-fix', Boolean(steam.needsFix));
+  banner.disabled = !steam.available;
+  $('steam-banner-title').textContent = text.title;
+  $('steam-banner-detail').textContent = text.detail;
+  $('steam-banner-mark').textContent = text.mark;
+  banner.setAttribute('aria-label', `${text.title}. ${text.detail}`);
+}
+async function refreshSteamBanner() {
+  try { steam = await window.colo.steamStatus() || {}; } catch { steam = {}; }
+  renderSteamBanner();
+}
+// One Steam dialog: from the banner (add, or update once in Steam), or offered
+// once by Play on SteamOS, which then plays whatever the player chooses.
+const STEAM_MODES = {
+  add: { kicker: 'Add to Steam', intro: 'Adds Pokémon Colosseum to your Steam library, with artwork.', cancel: 'Cancel', confirm: 'Add to Steam' },
+  update: { kicker: 'In your Steam library', intro: "It's already in Steam. Update it to refresh its artwork, or to turn Skip Launcher on or off.",
+    cancel: 'Cancel', confirm: 'Update in Steam' },
+  offer: { kicker: 'Play from Steam?', intro: "Add Pokémon Colosseum to your Steam library and start it from Game Mode like your other games. We'll only ask once: the Add to Steam banner on the home screen does it any time.",
+    cancel: 'Not now', confirm: 'Add to Steam & play' },
+  fix: { kicker: 'Fix for Game Mode', intro: "Pokémon Colosseum is in your Steam library, but its shortcut is missing the --no-sandbox launch option, so it won't open in Game Mode. Let the launcher fix it: it keeps the shortcut's play time, collections and controller layout, and adds the artwork.",
+    cancel: 'Not now', confirm: 'Fix shortcut' }
+};
+let playAfterSteam = false;
+function openSteamDialog(mode) {
+  const text = STEAM_MODES[mode];
+  $('steam-add-kicker').textContent = text.kicker;
+  $('steam-add-intro').textContent = text.intro;
+  $('steam-add-cancel').textContent = text.cancel;
+  $('steam-add-confirm').textContent = text.confirm;
+  $('steam-skip-launcher').checked = ['update', 'fix'].includes(mode) && Boolean(steam.skipLauncher);
+  playAfterSteam = mode === 'offer';
+  $('steam-add').showModal();
+}
+// Not now, Esc or × after Play's offer: play as the player asked.
+$('steam-add').addEventListener('close', () => {
+  if (!playAfterSteam) return;
+  playAfterSteam = false;
+  runWizardAction('launchGame');
+});
+// Play's offer, on SteamOS while the launcher isn't in Steam yet. True when shown.
+function offerSteam() {
+  if (!steam.offer || current?.active) return false;
+  steam.offer = false;
+  window.colo.steamOffered('play').catch(() => {});
+  openSteamDialog('offer');
+  return true;
+}
+// Opening the launcher offers once to fix a shortcut without --no-sandbox.
+function offerSteamFix() {
+  if (!steam.offerFix || current?.active || page !== 'play' || [...document.querySelectorAll('.launcher-modal')].some(dialog => dialog.open)) return;
+  steam.offerFix = false;
+  window.colo.steamOffered('fix').catch(() => {});
+  openSteamDialog('fix');
+}
+$('add-to-steam').addEventListener('click', () => openSteamDialog(steam.needsFix ? 'fix' : steam.inSteam ? 'update' : 'add'));
+$('steam-add-confirm').addEventListener('click', async () => {
+  const play = playAfterSteam, fixing = Boolean(steam.needsFix);
+  playAfterSteam = false;
+  $('steam-add').close();
+  $('add-to-steam').disabled = true;
+  $('steam-banner-detail').textContent = steam.needsFix ? 'Fixing in Steam…' : steam.inSteam ? 'Updating in Steam…' : 'Adding to Steam…';
+  let failed = false;
+  try {
+    const done = await window.colo.addToSteam({ play: $('steam-skip-launcher').checked });
+    if (done.cancelled) setMessage('Not added. Steam needs to close for a moment to add the launcher.');
+    else {
+      const art = done.artwork === done.total ? ' with its artwork'
+        : done.artwork ? ` with ${done.artwork} of ${done.total} artwork images (SteamGridDB didn't send the rest)` : " without artwork (SteamGridDB couldn't be reached)";
+      const skip = done.play ? ' It starts the game straight away; open the launcher itself now and then for launcher updates.' : '';
+      setMessage(fixing ? `Fixed "${done.name}" in Steam${art}: it opens in Game Mode now. ${done.reopened ? 'Steam is opening again.' : 'Open Steam to find it.'}${skip}`
+        : `${done.added ? 'Added' : 'Updated'} "${done.name}" in your Steam library${art}. ${done.reopened ? 'Steam is opening again.' : 'Open Steam to find it.'}${skip}`);
+    }
+  } catch (error) { failed = true; showError(error); }
+  finally {
+    await refreshSteamBanner();
+    await sync();
+  }
+  // Play's offer plays afterwards, keeping the Steam message in view; an error stays to be read.
+  if (play && !failed) {
+    const shown = $('message-text').textContent;
+    runWizardAction('launchGame');
+    if (shown) setMessage(shown);
+  }
+});
+refreshSteamBanner().then(offerSteamFix);
+
 $('play').addEventListener('click', () => {
-  if (wizardStep === 0) runWizardAction('launchGame');
+  if (wizardStep === 0) { if (!offerSteam()) runWizardAction('launchGame'); }
   else if (wizardStep === 1) {
     if (current.platform.id === 'macos' && !current.tools.appleReady) { showMacHelp(); return; }
     if (current.repoReady && current.tools.ready) { wizardStep = 2; refresh(current); }

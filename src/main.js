@@ -23,6 +23,9 @@ const { createActivityLog } = require('./activity-log');
 const { observeProcess, exitDescription, failureMessage } = require('./process-output');
 const { createSessionLog } = require('./session-log');
 const displayScale = require('./display-scale');
+const steam = require('./steam');
+const crashReports = require('./crash-reports');
+const { retrying, httpError } = require('./retry');
 
 const GAME_NAME = 'Pokémon Colosseum';
 const DISCORD_INVITE = 'https://discord.gg/pkVwBrSwsZ';
@@ -50,6 +53,9 @@ const activityLog = createActivityLog();
 const partialOutput = new Map();
 const sessionLog = createSessionLog(() => app.getPath('userData'), error =>
   logOutput(`Could not save the session log: ${error.message}`, 'launcher'));
+// `--play` (for a Steam shortcut's launch options) starts the game without the
+// launcher's window and quits when the game closes.
+const playOnStart = process.argv.includes('--play');
 const ownsInstance = app.requestSingleInstanceLock();
 if (!ownsInstance) app.quit();
 else if (portableRoot && app.isPackaged)
@@ -177,6 +183,10 @@ function loadConfig() {
     installRoot: typeof saved.installRoot === 'string' ? saved.installRoot : null,
     previousInstall: saved.previousInstall || null,
     completedSetup: Boolean(saved.completedSetup),
+    // Whether Play has offered Add to Steam on SteamOS yet (it does once).
+    steamOffered: Boolean(saved.steamOffered),
+    // Whether the launcher has offered to fix a Steam shortcut without --no-sandbox.
+    steamFixOffered: Boolean(saved.steamFixOffered),
     gameSource: savedGameSource(saved.gameSource),
     // The newest launcher version whose changelog the player has been shown.
     changelogSeen: changelog.baseVersion(saved.changelogSeen),
@@ -279,6 +289,164 @@ async function allowGcAdapter() {
   await new Promise(resolve => setTimeout(resolve, 1500)); // for udev to apply it
   return { ok: true, status: await gcAdapterStatus() };
 }
+
+// Add to Steam (steam.js). Steam reads non-Steam games only when it starts and
+// writes them back when it closes, so an open Steam closes first (steam://exit).
+// On Windows it opens again afterwards; on Linux the player opens it, since a
+// Steam started from the AppImage runs in its environment (a Steam Deck player
+// saw it open as Game Mode inside Desktop Mode).
+function steamRunning() {
+  const [command, args] = process.platform === 'win32' ? ['tasklist', ['/FI', 'IMAGENAME eq steam.exe', '/NH']] : ['pgrep', ['-x', 'steam']];
+  return new Promise(resolve => execFile(command, args, { windowsHide: true },
+    (error, stdout) => resolve(process.platform === 'win32' ? /steam\.exe/i.test(stdout || '') : !error)));
+}
+
+// Closed once it has stayed closed for several checks in a row: a Steam that
+// starts again straight after exiting (as SteamOS can) would write its own copy
+// of the list over the launcher's when it next closes.
+async function waitForSteamToClose() {
+  const deadline = Date.now() + 60000;
+  for (let closed = 0; closed < 5;) {
+    if (Date.now() > deadline) throw new Error("Steam didn't close. Close Steam yourself, then choose Add to Steam again.");
+    closed = (await steamRunning()) ? 0 : closed + 1;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+}
+
+function windowsSteamPath() {
+  return new Promise(resolve => execFile('reg', ['query', 'HKCU\\Software\\Valve\\Steam', '/v', 'SteamPath'], { windowsHide: true },
+    (error, stdout) => resolve(error ? null : steam.registrySteamPath(stdout))));
+}
+
+// Steam artwork comes straight from SteamGridDB into memory: no-store keeps it
+// out of the launcher's web cache, so the only copy is the one in Steam's folder.
+async function downloadImage(url) {
+  return retrying(async () => {
+    const response = await net.fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw httpError(`${url}: HTTP ${response.status}`, response.status);
+    return Buffer.from(await response.arrayBuffer());
+  });
+}
+
+// The file Steam starts: the installed launcher, or the AppImage on Linux.
+// Not in development, and not on macOS.
+function launcherExe() {
+  if (!app.isPackaged || !['win32', 'linux'].includes(process.platform)) return null;
+  // The portable launcher runs from a temporary copy: Steam starts the .exe the player has.
+  return (process.platform === 'linux' ? process.env.APPIMAGE : process.env.PORTABLE_EXECUTABLE_FILE || process.execPath) || null;
+}
+
+const startedFromSteam = () => Boolean(process.env.SteamGameId || process.env.SteamAppId);
+
+async function locateSteam() {
+  const registryPath = process.platform === 'win32' ? await windowsSteamPath() : null;
+  const root = steam.findSteam(steam.steamRoots({ registryPath }));
+  return root ? { root, accounts: steam.steamAccounts(root) } : null;
+}
+
+// SteamOS, as on a Steam Deck (LCD or OLED alike): Play offers Add to Steam there once.
+function onSteamOS() {
+  if (process.platform !== 'linux') return false;
+  const read = file => { try { return fs.readFileSync(file, 'utf8'); } catch { return ''; } };
+  return steam.isSteamOS({ osRelease: read('/etc/os-release'), vendor: read('/sys/devices/virtual/dmi/id/sys_vendor') });
+}
+
+// The home screen's Steam banner: Add to Steam while Steam is installed and the
+// launcher is not in its library yet, and a tick once it is. `reason` says why,
+// and goes in the log whenever it changes, so a player's saved log shows it.
+// The AppImage needs `--no-sandbox` from Steam: without it, a shortcut opens
+// the launcher in Desktop Mode but not in Game Mode. AppImages built with
+// scripts/after-pack.js always pass it themselves (COLO_LAUNCHER_NO_SANDBOX), so
+// for them a shortcut without it needs no fix; new shortcuts still get it.
+const STEAM_LAUNCH_OPTIONS = process.platform === 'linux' ? '--no-sandbox' : '';
+const sandboxAlwaysOff = process.env.COLO_LAUNCHER_NO_SANDBOX === '1';
+delete process.env.COLO_LAUNCHER_NO_SANDBOX; // not passed on to the game or Steam
+
+async function readSteamStatus() {
+  const exe = launcherExe();
+  if (!exe) return { available: false, reason: process.platform === 'linux' && app.isPackaged
+    ? "Add to Steam isn't offered: the launcher isn't running from its AppImage." : null };
+  if (startedFromSteam()) {
+    // Steam's shortcut started this launcher, so its options are ours.
+    const needsFix = !sandboxAlwaysOff && steam.missingOptions(process.argv.slice(1).join(' '), STEAM_LAUNCH_OPTIONS);
+    return { available: false, inSteam: true, needsFix, reason: needsFix
+      ? `Steam: the launcher was started from a Steam shortcut without ${STEAM_LAUNCH_OPTIONS}, so it won't open in Game Mode.`
+      : 'Steam: the launcher was started from Steam, so it is in your Steam library.' };
+  }
+  const located = await locateSteam();
+  if (!located) return { available: false, reason: "Add to Steam isn't offered: no signed-in Steam was found on this computer." };
+  if (!located.accounts.length)
+    return { available: false, reason: `Add to Steam isn't offered: nobody has signed in to Steam at ${located.root} yet.` };
+  const options = steam.shortcutLaunchOptions({ ...located, exe });
+  const inSteam = steam.hasShortcut({ ...located, exe });
+  const steamOS = onSteamOS();
+  const needsFix = inSteam && !sandboxAlwaysOff && steam.missingOptions(options, STEAM_LAUNCH_OPTIONS);
+  return { available: true, inSteam, needsFix, skipLauncher: steam.skipsLauncher(options), steamOS,
+    offer: steamOS && !inSteam && !config.steamOffered,
+    offerFix: needsFix && !config.steamFixOffered,
+    reason: needsFix ? `Steam: the launcher's shortcut in Steam is missing ${STEAM_LAUNCH_OPTIONS}, so it won't open in Game Mode (${located.root}).`
+      : inSteam ? `Steam: the launcher is in your Steam library (${located.root}).`
+      : `Steam: the launcher isn't in your Steam library yet (${located.root}${steamOS ? ', SteamOS' : ''}), so Add to Steam is offered.` };
+}
+
+let steamReasonLogged = null;
+async function steamStatus() {
+  let status;
+  try { status = await readSteamStatus(); }
+  catch (error) { status = { available: false, reason: `Add to Steam isn't offered: Steam could not be checked (${error.message}).` }; }
+  if (status.reason && status.reason !== steamReasonLogged) log(status.reason);
+  steamReasonLogged = status.reason;
+  return status;
+}
+// Play offers Add to Steam on SteamOS only once, and opening the launcher
+// offers to fix a shortcut without --no-sandbox only once, whatever the player chooses.
+function markSteamOffered(prompt) {
+  config[prompt === 'fix' ? 'steamFixOffered' : 'steamOffered'] = true;
+  saveConfig();
+}
+
+// `play` (Skip Launcher) adds `--play`, so Steam starts the game without the launcher's window.
+async function addToSteam({ play = false } = {}) {
+  const exe = launcherExe();
+  if (!exe) throw new Error(process.platform === 'linux' ? 'Add to Steam works from the launcher AppImage.' : 'Add to Steam works from the installed launcher on Windows and Linux.');
+  if (startedFromSteam()) throw new Error('The launcher was started from Steam, so it is already in your Steam library.');
+  const located = await locateSteam();
+  if (!located) throw new Error("Steam isn't installed on this computer, or nobody has signed in to it yet.");
+  const { root, accounts } = located;
+  if (!accounts.length) throw new Error('Sign in to Steam once, then try again.');
+  log('Downloading Steam artwork from SteamGridDB…');
+  const artwork = await steam.downloadArtwork(downloadImage);
+  const wasRunning = await steamRunning();
+  const reopen = wasRunning && process.platform === 'win32';
+  if (wasRunning) {
+    const answer = await dialog.showMessageBox(window, {
+      type: 'question', buttons: ['Cancel', 'Close Steam and add'], defaultId: 1, cancelId: 0,
+      message: 'Close Steam to add the launcher?',
+      detail: `Steam picks up new non-Steam games only when it starts, so it closes for a moment${reopen ? ' and opens again afterwards' : '. Open it again once the launcher says it was added'}.`
+    });
+    if (answer.response !== 1) return { cancelled: true };
+  }
+  // Each folder's list is backed up before Steam closes, since Steam writes its
+  // own over it as it exits (see steam.snapshotShortcuts).
+  const snapshot = steam.snapshotShortcuts({ root });
+  log(`Steam's non-Steam games before ${wasRunning ? 'closing Steam' : 'adding'} (${root}): ${steam.describeShortcuts(snapshot)}. Adding to account ${accounts.join(', ')}.`);
+  if (wasRunning) {
+    log('Closing Steam…');
+    await shell.openExternal('steam://exit');
+    await waitForSteamToClose();
+    log(`Steam's non-Steam games after Steam closed: ${steam.describeShortcuts(steam.snapshotShortcuts({ root, backUp: false }))}.`);
+  }
+  const results = steam.addShortcut({ root, accounts, exe, startDir: path.dirname(exe), artwork, snapshot,
+    launchOptions: STEAM_LAUNCH_OPTIONS, play: Boolean(play) });
+  const added = results.some(result => result.added);
+  const images = Math.min(...results.map(result => result.artwork));
+  log(`${added ? 'Added' : 'Updated'} ${steam.APP_NAME} in Steam${play ? ' with Skip Launcher' : ''} (${images} of ${steam.ARTWORK.length} artwork images, ${root}).`);
+  for (const result of results)
+    log(`Steam account ${result.account}: kept its ${result.kept} other non-Steam games${result.backup ? `; the list from before is saved as ${result.backup}` : ''}.`);
+  if (reopen) shell.openExternal('steam://open/games').catch(() => {});
+  return { added, play: Boolean(play), name: steam.APP_NAME, artwork: images, total: steam.ARTWORK.length, reopened: reopen };
+}
+
 
 function requireRepo() {
   if (!port.isPort(config.repo)) throw new Error('Download the setup files or choose a folder that already has them.');
@@ -715,6 +883,14 @@ function bindingsEnvironment(settings) {
 
 function customTextureDirectory() { return port.customTextureDirectory(app.getPath('userData')); }
 
+// A game that closed with an error says where its crash report is, when it left one.
+function noteCrashReport(error, since) {
+  const report = crashReports.newestSince(crashReports.directory(), since);
+  if (!report) return;
+  log(`Crash report: ${report.file}`);
+  error.message += ' Settings → Launcher can copy its crash report for a bug report.';
+}
+
 async function play(installation = null) {
   const root = installation?.repo || requireRepo();
   // The player's choices, not the build's: an earlier install plays with them too.
@@ -738,7 +914,10 @@ async function play(installation = null) {
     return await launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, PLAY_LABEL, true);
   } catch (error) {
     // Stop game ends it on purpose: that is no failure to report.
-    if (!wasStopped(startedAt)) throw error;
+    if (!wasStopped(startedAt)) {
+      noteCrashReport(error, startedAt);
+      throw error;
+    }
     log('Stopped the game.');
     return { ok: true };
   } finally {
@@ -763,6 +942,33 @@ async function playInstalled() {
   if (settings.textures !== config.settings.textures)
     log('Playing the installed game without missing HD downloads. Your visual settings are saved for later setup.');
   return play({ repo: root, settings });
+}
+
+// Why `--play` opens the launcher instead of the game, or null if the game can start as it is.
+function directPlayBlocker() {
+  if (!port.isPort(config.repo) || !binaryReady()) return 'the game is not set up yet.';
+  try { port.validateRom(config.rom); } catch (error) { return error.message; }
+  if (config.settings.autoUpdate && !game.isCurrent(config.repo, currentSource())) return 'a game update is ready.';
+  if (!port.hdVisualsInstalled(config.repo, config.settings)) return 'HD visuals need to be set up.';
+  return null;
+}
+
+// Plays with the launcher's settings, without downloading or building anything.
+// False when the launcher should open: the game needs setup or an update, or it
+// failed (the activity log shows why).
+let directPlayFailure = null;
+async function playDirectly() {
+  const blocker = directPlayBlocker();
+  if (blocker) {
+    log(`Opened the launcher instead of the game: ${blocker}`);
+    return false;
+  }
+  try { await exclusive(PLAY_LABEL, () => play(), true); }
+  catch (error) {
+    directPlayFailure = error.message;
+    return false;
+  }
+  return true;
 }
 
 // What the launcher can make again: the game's build output, downloaded archives and old versions.
@@ -825,7 +1031,8 @@ function state() {
       previousReady: Boolean(config.previousInstall && binaryReady(config.previousInstall.repo)) },
     active: activityState(), appUpdate, logs: activityLog.snapshot(), logResetSequence: activityLog.resetSequence(),
     saveDirectory: currentSaveDirectory(), backupDirectory: saves.backupRoot(),
-    backups: saves.listBackups().filter(item => item.source === currentSaveDirectory())
+    backups: saves.listBackups().filter(item => item.source === currentSaveDirectory()),
+    crashReports: crashReports.summary(crashReports.directory()), directPlayFailure
   };
 }
 
@@ -1162,6 +1369,18 @@ function registerHandlers() {
   ipcMain.handle('open-changelog-page', () => shell.openExternal(changelog.PAGE_URL));
   // Only this fixed invite opens: the page never chooses a URL.
   ipcMain.handle('open-discord', () => shell.openExternal(DISCORD_INVITE));
+  ipcMain.handle('steam-status', () => steamStatus());
+  ipcMain.handle('steam-offered', (_event, prompt) => markSteamOffered(prompt));
+  ipcMain.handle('add-to-steam', (_event, options) => exclusive('Add to Steam', () => addToSteam(options)));
+  ipcMain.handle('copy-crash-report', () => {
+    const report = crashReports.list(crashReports.directory())[0];
+    if (!report) throw new Error('There are no crash reports.');
+    clipboard.writeText(crashReports.read(report.file));
+  });
+  ipcMain.handle('open-crash-reports', () => {
+    fs.mkdirSync(crashReports.directory(), { recursive: true });
+    return shell.openPath(crashReports.directory());
+  });
 }
 
 function windowState(target) {
@@ -1192,10 +1411,12 @@ function createWindow() {
   });
 }
 
-if (ownsInstance) app.whenReady().then(() => {
+if (ownsInstance) app.whenReady().then(async () => {
   loadConfig();
   registerHandlers();
+  if (playOnStart && await playDirectly()) return app.quit();
   createWindow();
+  // Only with the window: a launcher update installs on quit, which `--play` does as the game closes.
   setupAppUpdater();
   removeOldVersionsInBackground();
   // The bundled manifest is the update check. Source downloads and builds

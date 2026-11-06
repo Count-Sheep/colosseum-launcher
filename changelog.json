@@ -1,7 +1,11 @@
 {
   "beta": {
     "launcher": [
-      "Battle animations: moves, send-outs and HP bars play at 2× speed by default. Change to normal speed or 4×, or skip them, under Gameplay."
+      "Battle animations: moves, send-outs and HP bars play at 2× speed by default. Change to normal speed or 4×, or skip them, under Gameplay.",
+      "Add to Steam: play from your Steam library, Big Picture or Game Mode, with artwork. Find it on the main screen, on Windows and Linux.",
+      "Skip Launcher: Steam can start the game straight away, and --play does the same from any shortcut.",
+      "Graphics presets: Low, Medium, High, Ultra and Steam Deck set the picture all at once. Find them under Graphics.",
+      "Crash reports: copy the newest report for a bug report, under Launcher. They stay on your computer."
     ],
     "game": [
       "Fixed the game crashing as soon as its first logo movie started.",
