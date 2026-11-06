@@ -103,6 +103,18 @@ test('battle speed is 2x unless changed, and Normal leaves it to the game', () =
   } finally { if (saved !== undefined) process.env.COLO_BATTLE_SPEED = saved; }
 });
 
+test('HD models are on unless turned off, and on leaves it to the game', () => {
+  const env = hdModels => port.buildEnvironment(port.normalizeSettings({ hdModels }), 'disc', '/port').COLO_HD_MODELS;
+  const saved = process.env.COLO_HD_MODELS;
+  delete process.env.COLO_HD_MODELS;
+  try {
+    assert.equal(port.normalizeSettings({}).hdModels, true);
+    assert.equal(env(undefined), undefined);
+    assert.equal(env(true), undefined);
+    assert.equal(env(false), '0');
+  } finally { if (saved !== undefined) process.env.COLO_HD_MODELS = saved; }
+});
+
 test('a saved 8x battle speed, which Beta launchers offered, becomes 4x', () => {
   assert.equal(port.normalizeSettings({ battleSpeed: '8' }).battleSpeed, '4');
 });

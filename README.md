@@ -63,7 +63,7 @@ After setup, the main screen is just **Play** and the tabs above it.
 
 - **Gameplay** skips the movies and chooses how the game's text is drawn.
 - **Display** has the screen format, fullscreen, frame rate (30 or 60 fps) and V-Sync.
-- **Graphics** has presets (Low, Medium, High, Ultra and Steam Deck), the renderer (Vulkan, or OpenGL), picture sharpness up to 4×, anti-aliasing, filtering, upscaling and the HD textures.
+- **Graphics** has presets (Low, Medium, High, Ultra and Steam Deck), the renderer (Vulkan, or OpenGL), picture sharpness up to 4×, anti-aliasing, filtering, upscaling, the HD textures and HD models.
 - **Controls** sets the keys and controller buttons for each GameCube button, and the sticks, triggers and rumble.
 - **Manage game** has game updates, rebuilding, the setup folder and disc file, and space cleanup.
 - **Launcher** has dark mode, automatic updates, crash reports and your launcher, game and tool versions for support.

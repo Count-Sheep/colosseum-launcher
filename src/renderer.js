@@ -646,7 +646,7 @@ function refresh(data) {
 // The settings that are a list or a range, and the ones that are a switch: each saves under its element's id.
 const SELECTS = ['widescreen', 'resolution', 'frameRate', 'vsync', 'fullscreenMode', 'exclusiveResolution', 'display', 'msaa', 'anisotropic',
   'sharpen', 'brightness', 'aspect', 'presentFilter', 'fsrMode', 'textureLoading', 'renderer', 'hdText', 'battleSpeed', 'padMode', 'updateChannel'];
-const SWITCHES = ['fullscreen', 'hudEdges', 'skipMovies', 'overlay', 'backgroundInput', 'fxaa', 'textures', 'shaderWarmup', 'autoUpdate', 'autoBackups', 'darkMode'];
+const SWITCHES = ['fullscreen', 'hudEdges', 'skipMovies', 'overlay', 'backgroundInput', 'fxaa', 'textures', 'hdModels', 'shaderWarmup', 'autoUpdate', 'autoBackups', 'darkMode'];
 
 let updateChannels = [{ id: 'stable', label: 'Stable' }];
 function renderUpdateChannels(chosen) {
