@@ -4,6 +4,7 @@
       "The game now builds from the port's own copy of the decompilation."
     ],
     "game": [
+      "Wes now has his detailed battle model while walking around, with a sharper face and real fingers.",
       "Fixed the Pokémon faces missing from the Battle Now team screen.",
       "Fixed opposing trainers misjudging a side's conditions and level-based moves.",
       "Fixed the second trainer on a side being mistaken for the first.",
