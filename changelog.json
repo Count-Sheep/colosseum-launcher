@@ -4,6 +4,7 @@
       "Battle animations: play moves, send-outs and HP bars at 4× or 8× speed, or skip them. Find it under Gameplay."
     ],
     "game": [
+      "Fixed items and Poké Balls saying they were meaningless to use in battle, and the bag jumping to another pocket afterwards.",
       "Fixed shop messages showing the wrong price and item, like nearly 2 billion for one Super Potion. Sales always paid the right amount.",
       "Fixed the game crashing when you pressed Down in the P★DA's Strategy Memo list.",
       "Installing and updating the game downloads less: it no longer fetches two extra repositories to build.",
