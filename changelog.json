@@ -1,6 +1,8 @@
 {
   "beta": {
-    "launcher": [],
+    "launcher": [
+      "Beta gets a new game build only after it has passed a test run through the movies and into a battle."
+    ],
     "game": []
   },
   "releases": [
