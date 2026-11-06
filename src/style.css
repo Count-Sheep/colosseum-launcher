@@ -552,3 +552,49 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .play-source strong { font-weight: 700; }
 .play-source span:last-child { overflow: hidden; color: #ffe2a3cc; font: 600 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .play-source span:last-child:empty { display: none; }
+
+/* Add to Steam and the graphics preset, as in SMS Launcher. */
+.intro-banners { flex: none; display: grid; gap: 8px; margin-left: 20px; }
+.discord-banner { display: flex; align-items: center; gap: 12px; padding: 10px 15px 10px 10px; border-color: #a5e0e47d; border-radius: 12px; background: linear-gradient(135deg, #123e59e6, #087e91e0); color: #fff; text-align: left; text-shadow: none; box-shadow: 0 10px 26px #061f3566; backdrop-filter: blur(14px); }
+.discord-banner:hover { border-color: #d3f2f5; background: linear-gradient(135deg, #17496be8, #0a91a6e6); }
+.discord-logo { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #5865f2; }
+.discord-logo svg { width: 23px; height: 23px; fill: #fff; }
+.steam-logo { background: linear-gradient(135deg, #1b2838, #2a475e); }
+.steam-banner:disabled { opacity: .75; cursor: progress; }
+.discord-copy { display: grid; gap: 2px; }
+.discord-copy strong { font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
+.discord-copy small { color: #d2eaf0; font-size: 11px; font-weight: 500; }
+.discord-arrow { margin-left: 4px; color: #ffda91; font-size: 15px; font-weight: 800; }
+.steam-modal { width: min(460px, calc(100% - 36px)); }
+.steam-actions { justify-content: flex-end; margin-top: 16px; }
+.preset-group .field { min-height: 60px; }
+.steam-banner.in-steam .discord-arrow { color: #a4d007; font-weight: 800; }
+.steam-banner.needs-fix { border-color: #ffc75acc; }
+.steam-banner.needs-fix .discord-arrow { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #ffc75a; color: #3b2a00; font-size: 13px; font-weight: 900; }
+.steam-banner:is(.in-steam, .needs-fix):disabled { opacity: 1; cursor: default; }
+.steam-banner.in-steam:disabled:hover { border-color: #a5e0e47d; background: linear-gradient(135deg, #123e59e6, #087e91e0); }
+.launcher-modal.steam-modal { width: min(500px, calc(100% - 36px)); border-color: #000; border-radius: 6px; background: #1b2838; color: #c7d5e0; box-shadow: 0 24px 80px #000c; }
+.steam-bar { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 8px 16px; background: #171a21; }
+.steam-brand { display: flex; align-items: center; gap: 8px; color: #dcdedf; font-size: 13px; font-weight: 800; letter-spacing: .18em; }
+.steam-brand svg { width: 20px; height: 20px; fill: #dcdedf; }
+.launcher-modal.steam-modal .modal-close { width: 28px; height: 28px; border: 0; border-radius: 2px; background: transparent; color: #8f98a0; font-size: 20px; }
+.launcher-modal.steam-modal .modal-close:hover { background: #3d4450; color: #fff; }
+.steam-hero { flex: none; padding: 26px 24px 18px; background: radial-gradient(ellipse at 80% 0, #66c0f455 0, #66c0f400 55%), radial-gradient(ellipse at 0 100%, #f0b42933 0, #f0b42900 50%), linear-gradient(160deg, #2a475e, #1b2838 75%); border-bottom: 1px solid #000; }
+.steam-kicker { color: #66c0f4; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.steam-hero h1 { margin-top: 4px; color: #fff; font-size: 26px; font-weight: 800; letter-spacing: -.01em; text-shadow: 0 2px 12px #000a; }
+.steam-body { padding-top: 16px; }
+.steam-intro { color: #c7d5e0; font-size: 13px; line-height: 1.45; }
+.steam-perks { display: grid; gap: 6px; margin: 12px 0 4px; padding: 0; list-style: none; color: #acb2b8; font-size: 12px; }
+.steam-perks li { display: flex; gap: 8px; align-items: baseline; }
+.steam-perks li::before { flex: none; color: #a4d007; font-weight: 800; content: '✓'; }
+.launcher-modal.steam-modal .switch { margin-top: 10px; padding: 12px 14px; border: 0; border-radius: 3px; background: #ffffff0d; }
+.launcher-modal.steam-modal .switch strong { color: #fff; }
+.launcher-modal.steam-modal .switch small { color: #8f98a0; }
+.launcher-modal.steam-modal .switch i { background: #3d4450; }
+.launcher-modal.steam-modal .switch input:checked + i { background: #1a9fff; }
+.steam-note { margin-top: 10px; color: #8f98a0; font-size: 11px; }
+.launcher-modal.steam-modal .steam-secondary { border: 0; border-radius: 2px; background: #3d4450; color: #dcdedf; }
+.launcher-modal.steam-modal .steam-secondary:hover:not(:disabled) { background: #464d58; color: #fff; }
+.launcher-modal.steam-modal .steam-primary { border: 0; border-radius: 2px; padding: 9px 22px; background: linear-gradient(90deg, #75b022 5%, #588a1b 95%); color: #d2efa9; text-transform: uppercase; letter-spacing: .04em; }
+.launcher-modal.steam-modal .steam-primary:hover:not(:disabled) { background: linear-gradient(90deg, #8ed629 5%, #6aa621 95%); color: #fff; }
+.gamepad-active .launcher-modal.steam-modal :is(button, input):focus, .gamepad-active .launcher-modal.steam-modal .switch:focus-within { outline-color: #66c0f4; }

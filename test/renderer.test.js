@@ -13,7 +13,7 @@ function state() {
     platform: port.platformInfo(), tools: { ready: true, appleReady: true },
     repoReady: true, romReady: true, binaryReady: true, hdVisualsReady: true, texturePack: { size: 2e9, unpacked: 2e9 },
     game: { needsUpdate: true, installedVersion: 'older', availableVersion: 'newer', launcherVersion: '0.1.39' },
-    appUpdate: { message: '' }, backups: [], logs: [], active: null
+    appUpdate: { message: '' }, backups: [], logs: [], active: null, crashReports: { folder: '/state/crashes', count: 0, newest: null }
   };
 }
 
@@ -73,7 +73,7 @@ async function renderer(data = state(), copyError = null, notes = { releases: []
     },
   };
   const context = vm.createContext({ console, setInterval() {}, clearInterval() {}, requestAnimationFrame: callback => setImmediate(callback),
-    cancelAnimationFrame() {}, navigator: { getGamepads: () => [] }, ColoBindings: require('../src/bindings'),
+    cancelAnimationFrame() {}, navigator: { getGamepads: () => [] }, ColoBindings: require('../src/bindings'), ColoPresets: require('../src/presets'),
     window: { colo, coloActivityLog: require('../src/activity-log'), coloChangelogText: require('../src/changelog-text'), coloGamepadNav: { start: options => Object.assign(gamepad, options) },
       addEventListener(event, callback) { (listeners.window ||= {})[event] = [...(listeners.window[event] || []), callback]; }, removeEventListener() {} }, document: {
     getElementById(id) { assert.ok(elements.has(id), `Missing HTML element ${id}`); return elements.get(id); },

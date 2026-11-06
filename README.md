@@ -63,10 +63,10 @@ After setup, the main screen is just **Play** and the tabs above it.
 
 - **Gameplay** skips the movies and chooses how the game's text is drawn.
 - **Display** has the screen format, fullscreen, frame rate (30 or 60 fps) and V-Sync.
-- **Graphics** has the renderer (Vulkan, or OpenGL), picture sharpness up to 4×, anti-aliasing, filtering, upscaling and the HD textures.
+- **Graphics** has presets (Low, Medium, High, Ultra and Steam Deck), the renderer (Vulkan, or OpenGL), picture sharpness up to 4×, anti-aliasing, filtering, upscaling and the HD textures.
 - **Controls** sets the keys and controller buttons for each GameCube button, and the sticks, triggers and rumble.
 - **Manage game** has game updates, rebuilding, the setup folder and disc file, and space cleanup.
-- **Launcher** has dark mode, automatic updates and your launcher, game and tool versions for support.
+- **Launcher** has dark mode, automatic updates, crash reports and your launcher, game and tool versions for support.
 
 The defaults are **HD textures on**, **4×** picture sharpness, **60 fps** and a picture **as wide as the window**. Changes take effect the next time you start the game.
 
@@ -93,6 +93,20 @@ Launcher updates download automatically when **Update automatically** is on and 
 ### Join the Beta
 
 Beta has the newest launcher and the newest game before they are released, and it is for testing, so it may break. Open **Settings → Launcher** and set **Launcher updates** to **Beta**. To leave, set it back to **Stable**. Portable launchers don't have this setting.
+
+### Add to Steam
+
+On Windows and Linux, **Add to Steam** on the main screen adds the game to your Steam library as a non-Steam game, with artwork from [SteamGridDB](https://www.steamgriddb.com), so it starts from Big Picture and Game Mode. The artwork is not part of the launcher: it downloads when you choose Add to Steam and is saved only in Steam's artwork folder. Steam closes for a moment while the launcher saves its shortcut. Your other non-Steam games stay as they are, and the launcher keeps a copy of Steam's list from before.
+
+Turn on **Skip Launcher** to have Steam start the game straight away. On a Steam Deck, the **Steam Deck** preset under **Settings → Graphics** suits its screen.
+
+### Start the game from Steam or a shortcut
+
+**Skip Launcher** adds `--play` to the shortcut's launch options, and you can add it to any shortcut yourself. `--play` never downloads or builds anything. If the game needs setup, an update (with **Update automatically** on) or HD textures, or if it closes with an error, the launcher opens instead so you can see why.
+
+### Crash reports
+
+If the game crashes, it saves a report on your computer. **Settings → Launcher → Crash reports** copies the newest one, ready to paste into a bug report, or opens the folder. The launcher never sends a report anywhere.
 
 ### Saved games and backups
 
