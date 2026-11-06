@@ -11,7 +11,8 @@
       "Fixed the second trainer on a side being mistaken for the first.",
       "Fixed Pokémon faces staying in memory after being replaced.",
       "Fixed the Pokédex seen and caught flags on Linux and macOS.",
-      "Fixed Poké Ball catch rates on Linux and macOS."
+      "Fixed Poké Ball catch rates on Linux and macOS.",
+      "Fixed the blue background on the main menus and save screen stopping short of the sides in widescreen."
     ]
   },
   "releases": [
