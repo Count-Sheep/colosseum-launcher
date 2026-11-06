@@ -4,7 +4,14 @@
       "Beta gets a new game build only after it has passed a test run through the movies and into a battle.",
       "The game now builds from the port's own copy of the decompilation."
     ],
-    "game": []
+    "game": [
+      "Fixed the Pokémon faces missing from the Battle Now team screen.",
+      "Fixed opposing trainers misjudging a side's conditions and level-based moves.",
+      "Fixed the second trainer on a side being mistaken for the first.",
+      "Fixed Pokémon faces staying in memory after being replaced.",
+      "Fixed the Pokédex seen and caught flags on Linux and macOS.",
+      "Fixed Poké Ball catch rates on Linux and macOS."
+    ]
   },
   "releases": [
     {
