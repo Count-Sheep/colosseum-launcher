@@ -1,7 +1,8 @@
 {
   "beta": {
     "launcher": [
-      "Beta gets a new game build only after it has passed a test run through the movies and into a battle."
+      "Beta gets a new game build only after it has passed a test run through the movies and into a battle.",
+      "The game now builds from the port's own copy of the decompilation."
     ],
     "game": []
   },
