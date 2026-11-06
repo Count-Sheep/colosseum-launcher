@@ -1,12 +1,12 @@
 <p align="center">
-  <a href="https://github.com/chasem-dev/colosseum-launcher/releases/latest"><img src="docs/download-button.svg" alt="Download Colosseum Launcher from the latest release"></a>
-  <br>
-  <a href="https://discord.gg/pkVwBrSwsZ"><img src="docs/discord-card.svg" alt="Join the Pokémon Colosseum Port Discord server"></a>
-  <br>
-  <a href="https://discord.gg/pkVwBrSwsZ"><img src="https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
+  <img src="build/icon.svg" width="112" height="112" alt="">
 </p>
 
-# Colosseum Launcher
+<h1 align="center">Colosseum Launcher</h1>
+
+<p align="center">
+  <a href="https://github.com/chasem-dev/colosseum-launcher/releases/latest"><img src="docs/download-button.svg" width="248" height="60" alt="Download Colosseum Launcher from the latest release"></a>&nbsp;&nbsp;<a href="https://discord.gg/pkVwBrSwsZ"><img src="docs/discord-button.svg" width="248" height="60" alt="Join the Pokémon Colosseum Port Discord server"></a>
+</p>
 
 <img width="1512" height="943" alt="image" src="https://github.com/user-attachments/assets/a513d488-33c6-4249-9792-5fb9c79a0b1b" />
 
