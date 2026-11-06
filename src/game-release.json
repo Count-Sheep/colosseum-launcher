@@ -1,15 +1,9 @@
 {
-  "version": "2026.11.05.3",
+  "version": "2026.11.06.1",
   "repository": "https://git.softwareauralabs.com/chase/pokemon-colosseum.git",
   "branch": "master",
-  "commit": "26351cd123e96f5798c1905cca9129c25fee527f",
+  "commit": "6d7fd530a3093df23c0eb0495f5a07db037f5323",
   "portPatch": "port-launcher.patch",
   "decompRepository": "https://github.com/dougchansan/pkmn-colosseum.git",
-  "decomp": "0275f31498f43ad807d4c91fa2da95ede5f5291b",
-  "renderer": {
-    "repository": "https://github.com/chasem-dev/sms-pc-port.git",
-    "commit": "40f26ac7ce5addba299ce817f636d0eca677162c",
-    "decompRepository": "https://github.com/chasem-dev/sms-english.git",
-    "decomp": "967436b8c623834d38a57d34923775f45eca8861"
-  }
+  "decomp": "0275f31498f43ad807d4c91fa2da95ede5f5291b"
 }

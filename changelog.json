@@ -1,33 +1,43 @@
 {
   "beta": {
-    "launcher": [
-      "Battle animations: moves, send-outs and HP bars play at 2× speed by default. Change to normal speed or 4×, or skip them, under Gameplay.",
-      "Add to Steam: play from your Steam library, Big Picture or Game Mode, with artwork. Find it on the main screen, on Windows and Linux.",
-      "Skip Launcher: Steam can start the game straight away, and --play does the same from any shortcut.",
-      "Graphics presets: Low, Medium, High, Ultra and Steam Deck set the picture all at once. Find them under Graphics.",
-      "Crash reports: copy the newest report for a bug report, under Launcher. They stay on your computer."
-    ],
-    "game": [
-      "Fixed a box appearing around the white ring in some battle moves. Their ripple effect now works too.",
-      "Fixed your partner walking behind you facing the wrong way on Linux and macOS.",
-      "Fixed battle timers always showing 0 on Linux and macOS.",
-      "Fixed the title menu's selection jumping to the next option instead of sliding on Linux and macOS.",
-      "Fixed the game crashing as soon as its first logo movie started.",
-      "Fixed items and Poké Balls saying they were meaningless to use in battle, and the bag jumping to another pocket afterwards.",
-      "Fixed shop messages showing the wrong price and item, like nearly 2 billion for one Super Potion. Sales always paid the right amount.",
-      "Fixed the game crashing when you pressed Down in the P★DA's Strategy Memo list.",
-      "Installing and updating the game downloads less: it no longer fetches two extra repositories to build.",
-      "Battle animations can run at 2× or 4× speed or be skipped, with menus at normal speed and text up long enough to read.",
-      "Building the game is faster: its code now compiles once instead of twice, on Windows too.",
-      "Setting up the game is quicker: the fixes its code needs now come ready-made instead of being worked out on your computer.",
-      "Game updates that change only part of the build now reuse more of what was already compiled.",
-      "The first game build after this update takes longer, as it starts over with what it keeps between builds.",
-      "Fixed new builds on Linux and macOS leaving out small corrections to battle and menu code that only a rebuild picked up.",
-      "Fixed the battle move menu showing the first move's PP and type whichever move you highlighted.",
-      "The logo movies at startup now fill a widescreen display with their background colour instead of black bars."
-    ]
+    "launcher": [],
+    "game": []
   },
   "releases": [
+    {
+      "version": "0.1.3",
+      "date": "2026-11-06",
+      "launcher": [
+        "Battle animations: moves, send-outs and HP bars play at 2× speed by default. Change to normal speed or 4×, or skip them, under Gameplay.",
+        "Add to Steam: play from your Steam library, Big Picture or Game Mode, with artwork. Find it on the main screen, on Windows and Linux.",
+        "Skip Launcher: Steam can start the game straight away, and --play does the same from any shortcut.",
+        "Graphics presets: Low, Medium, High, Ultra and Steam Deck set the picture all at once. Find them under Graphics.",
+        "Crash reports: copy the newest report for a bug report, under Launcher. They stay on your computer."
+      ],
+      "game": {
+        "version": "2026.11.06.1",
+        "commit": "6d7fd530a3093df23c0eb0495f5a07db037f5323",
+        "changes": [
+          "Fixed a box appearing around the white ring in some battle moves. Their ripple effect now works too.",
+          "Fixed your partner walking behind you facing the wrong way on Linux and macOS.",
+          "Fixed battle timers always showing 0 on Linux and macOS.",
+          "Fixed the title menu's selection jumping to the next option instead of sliding on Linux and macOS.",
+          "Fixed reflective effects not showing on Linux and macOS, along with the title options' animation and the stick in the P★DA.",
+          "Fixed items and Poké Balls saying they were meaningless to use in battle, and the bag jumping to another pocket afterwards.",
+          "Fixed shop messages showing the wrong price and item, like nearly 2 billion for one Super Potion. Sales always paid the right amount.",
+          "Fixed the game crashing when you pressed Down in the P★DA's Strategy Memo list.",
+          "Installing and updating the game downloads less: it no longer fetches two extra repositories to build.",
+          "Battle animations can run at 2× or 4× speed or be skipped, with menus at normal speed and text up long enough to read.",
+          "Building the game is faster: its code now compiles once instead of twice, on Windows too.",
+          "Setting up the game is quicker: the fixes its code needs now come ready-made instead of being worked out on your computer.",
+          "Game updates that change only part of the build now reuse more of what was already compiled.",
+          "The first game build after this update takes longer, as it starts over with what it keeps between builds.",
+          "Fixed new builds on Linux and macOS leaving out small corrections to battle and menu code that only a rebuild picked up.",
+          "Fixed the battle move menu showing the first move's PP and type whichever move you highlighted.",
+          "The logo movies at startup now fill a widescreen display with their background colour instead of black bars."
+        ]
+      }
+    },
     {
       "version": "0.1.2",
       "date": "2026-11-05",
