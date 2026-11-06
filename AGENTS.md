@@ -8,7 +8,7 @@
 
 The only commits without a changelog edit are ones a player cannot notice at all: tests, CI, refactors, or docs and agent notes like this file. Say so in the commit message (`No changelog: tests only`) so a reviewer can see it was a decision, not an oversight. If you are unsure whether a player could notice, add the line.
 
-Game changes count too. When you change the game ([pokemon-colosseum](https://git.softwareauralabs.com/chase/pokemon-colosseum)), add its `beta.game` line here as well, in the launcher PR that goes with it or a small changelog PR. Merge it once the game PR is merged, since Beta builds the newest commit on the game's verified branch (`verifiedBranch` in `src/game-release.json`), which reaches it once the commit has passed the port's regression suite.
+Game changes count too. When you change the game ([pokemon-colosseum](https://git.softwareauralabs.com/chase/pokemon-colosseum)), add its `beta.game` line here as well, in the launcher PR that goes with it or a small changelog PR. Merge it once the game PR is merged, since Beta builds the newest commit on the game's branch (`src/game-release.json`).
 
 Before you commit, check that `git diff --cached --stat` lists `changelog.json`, or that your commit message says why not.
 
