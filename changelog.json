@@ -19,7 +19,8 @@
       "Game updates that change only part of the build now reuse more of what was already compiled.",
       "The first game build after this update takes longer, as it starts over with what it keeps between builds.",
       "Fixed new builds on Linux and macOS leaving out small corrections to battle and menu code that only a rebuild picked up.",
-      "Fixed the battle move menu showing the first move's PP and type whichever move you highlighted."
+      "Fixed the battle move menu showing the first move's PP and type whichever move you highlighted.",
+      "The logo movies at startup now fill a widescreen display with their background colour instead of black bars."
     ]
   },
   "releases": [
