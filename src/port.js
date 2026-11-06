@@ -124,6 +124,8 @@ function normalizeSettings(input = {}, platform = process.platform) {
     presentFilter: choiceSetting(input.presentFilter, ['bilinear', 'sharp', 'nearest', 'fsr', 'nis'], 'bilinear'),
     fsrMode: choiceSetting(input.fsrMode, ['native', 'quality', 'balanced', 'performance', 'ultraperformance'], 'quality'),
     textures: input.textures !== false,
+    // People in the field drawn with their detailed models, made from the disc.
+    hdModels: input.hdModels !== false,
     // When HD textures load: while each area loads (stage), the whole pack and kept (all), or each when first drawn (play).
     textureLoading: choiceSetting(input.textureLoading, ['stage', 'all', 'play'], 'stage'),
     shaderWarmup: input.shaderWarmup !== false,
@@ -230,6 +232,7 @@ function buildEnvironment(settings, disc, root, { customTextures = null } = {}) 
     SMS_GX_SHADER_WARMUP: settings.shaderWarmup === false ? '0' : '1'
   };
   if (settings.skipMovies) env.COLO_SKIP_MOVIES = '1';
+  if (settings.hdModels === false) env.COLO_HD_MODELS = '0';
   if (settings.battleSpeed !== 'normal') env.COLO_BATTLE_SPEED = settings.battleSpeed;
   // Unset is the default; any other value would name a glyph file.
   if (settings.hdText !== 'on') env.COLO_HD_TEXT = settings.hdText === 'off' ? '0' : 'upscaled';
