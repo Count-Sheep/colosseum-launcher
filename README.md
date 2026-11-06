@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/chasem-dev/colosseum-launcher/releases/latest"><img src="docs/download-card.svg" alt="Download Colosseum Launcher from the latest release"></a>
+  <a href="https://github.com/chasem-dev/colosseum-launcher/releases/latest"><img src="docs/download-button.svg" alt="Download Colosseum Launcher from the latest release"></a>
   <br>
   <a href="https://discord.gg/pkVwBrSwsZ"><img src="docs/discord-card.svg" alt="Join the Pokémon Colosseum Port Discord server"></a>
   <br>
