@@ -99,3 +99,12 @@ test('resolves a fork branch and reads the decomp and renderer commits it names'
     assert.equal(asked, 1);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('Beta follows the verified branch, not the branch commits land on', () => {
+  assert.equal(typeof release.verifiedBranch, 'string');
+  assert.notEqual(release.verifiedBranch, release.branch);
+  const pins = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'game-pins.js'), 'utf8');
+  const refresh = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'refresh-beta.yml'), 'utf8');
+  assert.match(pins, /newestCommit\(release\.repository, release\.verifiedBranch\)/);
+  assert.match(refresh, /\.verifiedBranch/);
+});

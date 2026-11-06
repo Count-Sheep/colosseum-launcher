@@ -3,7 +3,8 @@
 // What a commit of the port builds with: it names the decomp in tools/ci/linux-build.sh. An older commit names the
 // renderer there too, and the renderer names its headers' repository as a submodule. Used by npm run update:game and,
 // for Beta, by CI.
-//   node scripts/game-pins.js   the newest commit of game-release.json's branch, as GitHub Actions outputs
+//   node scripts/game-pins.js   the newest commit Beta may have, as GitHub Actions outputs: game-release.json's
+//                               verifiedBranch, which only moves once a commit has passed the port's regression suite
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -49,7 +50,7 @@ function newestCommit(repository, branch) {
 
 if (require.main === module) {
   const release = require('../src/game-release.json');
-  const commit = newestCommit(release.repository, release.branch);
+  const commit = newestCommit(release.repository, release.verifiedBranch);
   const { decomp, renderer } = pinsAt(release.repository, commit);
   const headers = renderer ? rendererHeaders(OLDER_RENDERER.repository, renderer) : {};
   const lines = [`commit=${commit}`, `decomp=${decomp}`, `renderer=${renderer || ''}`, `renderer_decomp=${headers.decomp || ''}`];

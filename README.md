@@ -128,7 +128,7 @@ Open the activity log with **Activity log** in the status bar, choose **Copy log
 
 ### What it builds
 
-The game is [pokemon-colosseum](https://git.softwareauralabs.com/chase/pokemon-colosseum) (the port, on GitLab), compiled from the [pkmn-colosseum](https://github.com/dougchansan/pkmn-colosseum) decompilation, with the renderer's sources from [sms-pc-port](https://github.com/chasem-dev/sms-pc-port). `src/game-release.json` pins all of them to exact commits; the game folder holds the port with `deps/pkmn-colosseum` and `deps/sms-pc-port` inside it. The launcher only reads those repositories: its own changes to the port, for its private toolchain and for paths with spaces, are `scripts/port-launcher.patch`, applied to the checkout. `scripts/build-colosseum.sh` runs the port's own `build.sh` there. No game data is in any of those repositories, and the build needs none: the player's disc is read when the game runs.
+The game is [pokemon-colosseum](https://git.softwareauralabs.com/chase/pokemon-colosseum) (the port, on GitLab), compiled from the [pkmn-colosseum](https://github.com/chasem-dev/pkmn-colosseum) decompilation, with the renderer's sources from [sms-pc-port](https://github.com/chasem-dev/sms-pc-port). `src/game-release.json` pins all of them to exact commits; the game folder holds the port with `deps/pkmn-colosseum` and `deps/sms-pc-port` inside it. The launcher only reads those repositories: its own changes to the port, for its private toolchain and for paths with spaces, are `scripts/port-launcher.patch`, applied to the checkout. `scripts/build-colosseum.sh` runs the port's own `build.sh` there. No game data is in any of those repositories, and the build needs none: the player's disc is read when the game runs.
 
 The launcher is built on [SMS Launcher](https://github.com/chasem-dev/sms-launcher)'s setup: the same three steps, private toolsets and release pipeline, without that game's extras.
 
@@ -162,7 +162,7 @@ Every game version builds in a folder of its own, so a build keeps what it compi
 
 ### Versions and releases
 
-Every push to `main` also rebuilds the Beta (`refresh-beta.yml`, `build.yml`), which checks hourly for new commits on the port's branch. A pull request becomes a preview when **Build launcher** is run by hand with its number. **Game source** under Manage game builds from another port or decomp for testing.
+Every push to `main` also rebuilds the Beta (`refresh-beta.yml`, `build.yml`), which checks hourly for new commits on the port's verified branch (`verifiedBranch` in `src/game-release.json`). The port's `tools/regress/mark-verified.sh` moves that branch, on a machine with a disc image, once a commit has passed the regression suite: CI has no disc and only reaches the game's disc check, so a commit that crashes at its first movie would pass it. A pull request becomes a preview when **Build launcher** is run by hand with its number. **Game source** under Manage game builds from another port or decomp for testing.
 
 Each published Beta is announced in Discord when the `DISCORD_BETA_WEBHOOK` repository secret holds a channel webhook URL (in Discord: the channel's **Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL**, then `gh secret set DISCORD_BETA_WEBHOOK`). The message has the launcher and game versions, links to the release and both commits, and the notes added to Beta in `changelog.json` since the last Beta (all of them if the last Beta's notes can't be read). Without the secret, or if Discord is unreachable, Beta still publishes.
 
