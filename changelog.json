@@ -1,7 +1,11 @@
 {
   "beta": {
-    "launcher": [],
-    "game": []
+    "launcher": [
+      "Macs with Apple Silicon: the game now builds as a native program and draws with Metal, so it runs faster and Rosetta is no longer needed. Metal is the new default renderer on a Mac; Vulkan and OpenGL are still under Graphics."
+    ],
+    "game": [
+      "Macs with Apple Silicon: the game runs natively, and the wipe into a trainer battle plays in full instead of going black."
+    ]
   },
   "releases": [
     {

@@ -55,7 +55,7 @@ The launcher walks you through three steps:
 2. **Choose disc image.** Select a copy of your own original North American Pokémon Colosseum disc: **GC6E01, revision 0**. Supported files are `.iso` and `.gcm`. Compressed formats (CISO, RVZ, GCZ) need converting to ISO first, which Dolphin does with **Convert File**. The bonus disc is not the game.
 3. **Begin setup.** The launcher downloads HD textures and builds the game on your computer. This first setup can take a while.
 
-On Mac, setup may ask you to install Apple's Command Line Tools and, on Apple Silicon, Rosetta. Follow **Mac setup help** in the launcher. The game is an x86-64 program: its code needs memory below 4 GiB, which macOS never gives an Apple Silicon program, so Rosetta runs it there.
+On Mac, setup may ask you to install Apple's Command Line Tools. Follow **Mac setup help** in the launcher. The game is built for your Mac: on Apple Silicon it is a native program that draws with Metal, with no Rosetta needed.
 
 The progress bar shows what's happening. **View build log** opens more detail; closing that view keeps setup running. When setup finishes, press **Play**.
 
@@ -65,7 +65,7 @@ After setup, the main screen is just **Play** and the tabs above it.
 
 - **Gameplay** skips the movies and chooses how the game's text is drawn.
 - **Display** has the screen format, fullscreen, frame rate (30 or 60 fps) and V-Sync.
-- **Graphics** has presets (Low, Medium, High, Ultra and Steam Deck), the renderer (Vulkan, or OpenGL), picture sharpness up to 4×, anti-aliasing, filtering, upscaling, the HD textures and HD models.
+- **Graphics** has presets (Low, Medium, High, Ultra and Steam Deck), the renderer (Vulkan or OpenGL, and Metal on a Mac, where it is the default), picture sharpness up to 4×, anti-aliasing, filtering, upscaling, the HD textures and HD models.
 - **Controls** sets the keys and controller buttons for each GameCube button, and the sticks, triggers and rumble.
 - **Manage game** has game updates, rebuilding, the setup folder and disc file, and space cleanup.
 - **Launcher** has dark mode, automatic updates, crash reports and your launcher, game and tool versions for support.

@@ -6,11 +6,11 @@ What the port builds with, on every system: a pinned clang for the game code (zi
 
 - **Linux:** conda-forge packages with GCC against a glibc 2.17 sysroot, so the game runs on every distribution the launcher does. The game finds SDL2 and EGL in the tools through its RPATH.
 - **Windows:** a private MSYS2 with MINGW64 GCC, and llvm-mingw's clang 19 in its `llvm-mingw` folder. The game links SDL2 and the runtimes in, so it plays without the tools once built.
-- **macOS:** conda-forge packages with LLVM's object tools and `ld.lld`, which link the game's ELF objects into the image the executable carries. Small `clang`/`clang++` wrappers select Apple's compiler; Apple's SDK, Command Line Tools and Rosetta stay out of our archives, and the port fetches SDL2.framework and MoltenVK when it builds. Homebrew is not required.
+- **macOS:** conda-forge packages with LLVM's object tools and `ld.lld`, which link the game's ELF objects into the image the executable carries. Small `clang`/`clang++` wrappers select Apple's compiler; Apple's SDK and Command Line Tools stay out of our archives, and the port fetches SDL2.framework and MoltenVK when it builds. Homebrew is not required.
 
 ## macOS setup
 
-Step 1 checks Apple's tools and shows a guided checklist with copyable Terminal commands when needed: `xcode-select --install`, and on Apple Silicon `softwareupdate --install-rosetta`. Click **Check again** in Mac setup help, then continue Step 1. The launcher does not run system installers or accept Apple's licenses automatically.
+Step 1 checks Apple's tools and shows a guided checklist with a copyable Terminal command when needed: `xcode-select --install`. The game is native on both kinds of Mac (arm64 on Apple Silicon), so Rosetta is not needed. Click **Check again** in Mac setup help, then continue Step 1. The launcher does not run system installers or accept Apple's licenses automatically.
 
 ## Publish a new toolset
 
@@ -23,6 +23,6 @@ The tool archives contain only build dependencies. Port executables, disc images
 
 ## Smoke test shipped tools
 
-`npm ci && node scripts/smoke-build-tools.js` downloads the pinned archive and builds the game from `src/game-release.json` as a player's launcher does, with `PATH` limited to the private tools and from folders with spaces in their names. It checks the executable is x86-64 for its system, that the launcher takes the build for the current game, and that the game starts and asks for its disc. On Windows it also plants stand-in DLLs in System32, as some players' computers have, and checks the game needs nothing Windows lacks.
+`npm ci && node scripts/smoke-build-tools.js` downloads the pinned archive and builds the game from `src/game-release.json` as a player's launcher does, with `PATH` limited to the private tools and from folders with spaces in their names. It checks the executable is native for its system (x86-64, or arm64 on Apple Silicon), that the launcher takes the build for the current game, and that the game starts and asks for its disc. On Windows it also plants stand-in DLLs in System32, as some players' computers have, and checks the game needs nothing Windows lacks.
 
 During archive publication, `COLO_TOOL_ASSET_MANIFEST=tool-assets/manifest-<platform>.json` tests the local archive before its release exists. This override is only used by CI; the app uses the committed checksum pins.

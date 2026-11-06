@@ -39,7 +39,7 @@ async function main() {
       execFileSync('tar', ['-tzf', path.join(directory, file)], { stdio: ['ignore', 'ignore', 'inherit'] });
     execFileSync('gh', ['release', 'create', tag, '--repo', 'chasem-dev/colosseum-launcher', '--target', process.env.GITHUB_SHA,
       '--prerelease', '--title', tag, '--notes',
-      'Private build tools verified by compiling the selected game release after relocation. No ROM, game assets, or compiled game is included. Corresponding sources and notices accompany each archive. Each OS tool version is independent and reused across launcher releases. Mac tools still require Apple Command Line Tools and Rosetta on Apple Silicon.',
+      'Private build tools verified by compiling the selected game release after relocation. No ROM, game assets, or compiled game is included. Corresponding sources and notices accompany each archive. Each OS tool version is independent and reused across launcher releases. Mac tools still require Apple Command Line Tools on Apple Silicon.',
       ...files.map(file => path.join(directory, file)), path.join(directory, manifestName)], { stdio: 'inherit' });
   }
 }

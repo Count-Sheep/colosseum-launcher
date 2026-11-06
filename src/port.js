@@ -12,12 +12,12 @@ const PORT_URL = 'https://git.softwareauralabs.com/chase/pokemon-colosseum.git';
 // The HD texture pack: the port's own release, unpacked into mods/textures/colo-upscale-4x.
 const TEXTURE_PACK = require('./texture-pack.json');
 
-// The game is one 64-bit x86-64 build on every system: game code keeps 32-bit pointers and needs
-// memory below 4 GiB, which macOS never gives an arm64 process, so a Mac with Apple Silicon runs it
-// through Rosetta 2.
+// The game is built on the computer that plays it, for that computer: x86-64, and on a Mac with Apple
+// Silicon native arm64, drawn with Metal (the port's build.sh goes by the processor it runs on). The
+// first renderer is the system's default.
 function platformInfo(platform = process.platform) {
   if (platform === 'linux') return { name: 'Linux', id: 'linux', renderers: ['vulkan', 'opengl'] };
-  if (platform === 'darwin') return { name: 'macOS', id: 'macos', renderers: ['vulkan', 'opengl'] };
+  if (platform === 'darwin') return { name: 'macOS', id: 'macos', renderers: ['metal', 'vulkan', 'opengl'] };
   if (platform === 'win32') return { name: 'Windows', id: 'windows', renderers: ['vulkan', 'opengl'] };
   throw new Error(`This port does not support ${platform}.`);
 }
@@ -129,7 +129,7 @@ function normalizeSettings(input = {}, platform = process.platform) {
     // When HD textures load: while each area loads (stage), the whole pack and kept (all), or each when first drawn (play).
     textureLoading: choiceSetting(input.textureLoading, ['stage', 'all', 'play'], 'stage'),
     shaderWarmup: input.shaderWarmup !== false,
-    renderer: choiceSetting(input.renderer, info.renderers, 'vulkan'),
+    renderer: choiceSetting(input.renderer, info.renderers, info.renderers[0]),
     autoUpdate: input.autoUpdate !== false,
     updateChannel: normalizeChannel(input.updateChannel),
     // Save backups the launcher makes by itself (before and after play, before updates and cleanup).
@@ -148,6 +148,13 @@ function normalizeSettings(input = {}, platform = process.platform) {
   // The graphics preset chosen (src/presets.js), while the picture settings still match it; else Custom.
   settings.graphicsPreset = presets.reconcile({ ...settings, graphicsPreset: input.graphicsPreset });
   return settings;
+}
+
+// Metal became the Mac's renderer after Vulkan: a Vulkan saved before that was the default, not a
+// choice, so it moves over once. `moved` is the config's own flag, as the settings hold only what
+// Settings shows: a player who goes back to Vulkan afterwards stays there.
+function moveToMetal(settings, moved, platform = process.platform) {
+  return platform === 'darwin' && !moved && settings.renderer === 'vulkan' ? { ...settings, renderer: 'metal' } : settings;
 }
 
 function texturePackDirectory(root) { return path.join(root, 'mods', 'textures'); }
@@ -201,7 +208,7 @@ function buildEnvironment(settings, disc, root, { customTextures = null } = {}) 
   const env = {
     ...process.env,
     COLO_DISC: disc,
-    SMS_GX_BACKEND: settings.renderer === 'opengl' ? 'opengl' : 'vulkan',
+    SMS_GX_BACKEND: settings.renderer,
     SMS_GX_SCALE: String(settings.resolution),
     COLO_FPS: String(settings.frameRate),
     COLO_WIDESCREEN: settings.widescreen,
@@ -338,7 +345,7 @@ function gameRuntimeFolders(environment = process.env) {
   return [path.join(environment.MSYS2_ROOT || 'C:\\msys64', 'mingw64', 'bin')];
 }
 
-module.exports = { PORT_URL, TEXTURE_PACK, platformInfo, dependencyPaths, isPort, validateRom, normalizeSettings,
+module.exports = { PORT_URL, TEXTURE_PACK, platformInfo, dependencyPaths, isPort, validateRom, normalizeSettings, moveToMetal,
   texturePackDirectory, texturePackInstalled, hdVisualsInstalled, customTextureDirectory, customTexturesPresent, texturePackFolders,
   buildEnvironment, binaryPath, longPathProblem, playableInstall, useLauncherScripts, launcherScript,
   buildCommand, textureCommand, gameRunCommand, gameRuntimeFolders };

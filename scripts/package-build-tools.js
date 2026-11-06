@@ -25,7 +25,7 @@ const notices = ['# Build tool notices and source code', '',
   'Each package retains its own license. See the installed license files and the corresponding source asset.',
   'The source asset contains upstream sources, build recipes, patches, and package metadata.',
   `Source download: https://github.com/chasem-dev/colosseum-launcher/releases/download/build-tools-${id}-${toolset}/colo-build-tools-${id}-${toolset}-sources.tar.gz`, ''];
-if (platform === 'darwin') notices.push('Apple Command Line Tools, its SDK/compiler, and Rosetta are not included. The clang/clang++ wrapper scripts invoke the existing Apple compiler installed by the user.', '');
+if (platform === 'darwin') notices.push('Apple Command Line Tools and its SDK/compiler are not included. The clang/clang++ wrapper scripts invoke the existing Apple compiler installed by the user.', '');
 const packages = [];
 const downloaded = new Map();
 // Use a mirror only when the recipe pins these exact upstream bytes. invisible-mirror.net refuses GitHub's
