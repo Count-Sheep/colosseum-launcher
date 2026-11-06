@@ -89,18 +89,22 @@ test('settings reach the variables the game reads', () => {
   assert.equal(env.SMS_GAMMA, '1.50');
 });
 
-test('battle speed reaches the game only when it is changed', () => {
+test('battle speed is 2x unless changed, and Normal leaves it to the game', () => {
   const env = battleSpeed => port.buildEnvironment(port.normalizeSettings({ battleSpeed }), 'disc', '/port').COLO_BATTLE_SPEED;
   const saved = process.env.COLO_BATTLE_SPEED;
   delete process.env.COLO_BATTLE_SPEED;
   try {
-    assert.equal(env(undefined), undefined);
+    assert.equal(env(undefined), '2');
     assert.equal(env('normal'), undefined);
-    assert.equal(env('fast'), undefined);
+    assert.equal(env('fast'), '2');
+    assert.equal(env('2'), '2');
     assert.equal(env('4'), '4');
-    assert.equal(env('8'), '8');
     assert.equal(env('skip'), 'skip');
   } finally { if (saved !== undefined) process.env.COLO_BATTLE_SPEED = saved; }
+});
+
+test('a saved 8x battle speed, which Beta launchers offered, becomes 4x', () => {
+  assert.equal(port.normalizeSettings({ battleSpeed: '8' }).battleSpeed, '4');
 });
 
 test('HD text stays unset by default: any other value names a glyph file', () => {
