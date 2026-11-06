@@ -104,7 +104,7 @@ function normalizeSettings(input = {}, platform = process.platform) {
     skipMovies: Boolean(input.skipMovies),
     // How a battle's animations play: as on the disc, 2 or 4 times faster, or skipped.
     // Beta launchers offered 8 times faster: those players keep the fastest speed left.
-    battleSpeed: choiceSetting(input.battleSpeed === '8' ? '4' : input.battleSpeed, ['normal', '2', '4', 'skip'], 'normal'),
+    battleSpeed: choiceSetting(input.battleSpeed === '8' ? '4' : input.battleSpeed, ['normal', '2', '4', 'skip'], '2'),
     // The frame-time overlay at start.
     overlay: Boolean(input.overlay),
     // The fonts drawn sharp from the Inter typeface (on), the game's own upscaled, or as on the disc.

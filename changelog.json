@@ -1,7 +1,7 @@
 {
   "beta": {
     "launcher": [
-      "Battle animations: play moves, send-outs and HP bars at 2× or 4× speed, or skip them. Find it under Gameplay."
+      "Battle animations: moves, send-outs and HP bars play at 2× speed by default. Change to normal speed or 4×, or skip them, under Gameplay."
     ],
     "game": [
       "Fixed items and Poké Balls saying they were meaningless to use in battle, and the bag jumping to another pocket afterwards.",
