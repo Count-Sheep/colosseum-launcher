@@ -1,14 +1,14 @@
 {
   "beta": {
     "launcher": [
-      "Battle animations: play moves, send-outs and HP bars at 4× or 8× speed, or skip them. Find it under Gameplay."
+      "Battle animations: play moves, send-outs and HP bars at 2× or 4× speed, or skip them. Find it under Gameplay."
     ],
     "game": [
       "Fixed items and Poké Balls saying they were meaningless to use in battle, and the bag jumping to another pocket afterwards.",
       "Fixed shop messages showing the wrong price and item, like nearly 2 billion for one Super Potion. Sales always paid the right amount.",
       "Fixed the game crashing when you pressed Down in the P★DA's Strategy Memo list.",
       "Installing and updating the game downloads less: it no longer fetches two extra repositories to build.",
-      "Battle animations can run at 4× or 8× speed or be skipped, with menus at normal speed and text up long enough to read.",
+      "Battle animations can run at 2× or 4× speed or be skipped, with menus at normal speed and text up long enough to read.",
       "Building the game is faster: its code now compiles once instead of twice, on Windows too.",
       "Setting up the game is quicker: the fixes its code needs now come ready-made instead of being worked out on your computer.",
       "Game updates that change only part of the build now reuse more of what was already compiled.",

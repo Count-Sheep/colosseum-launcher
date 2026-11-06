@@ -97,10 +97,14 @@ test('battle speed reaches the game only when it is changed', () => {
     assert.equal(env(undefined), undefined);
     assert.equal(env('normal'), undefined);
     assert.equal(env('fast'), undefined);
+    assert.equal(env('2'), '2');
     assert.equal(env('4'), '4');
-    assert.equal(env('8'), '8');
     assert.equal(env('skip'), 'skip');
   } finally { if (saved !== undefined) process.env.COLO_BATTLE_SPEED = saved; }
+});
+
+test('a saved 8x battle speed, which Beta launchers offered, becomes 4x', () => {
+  assert.equal(port.normalizeSettings({ battleSpeed: '8' }).battleSpeed, '4');
 });
 
 test('HD text stays unset by default: any other value names a glyph file', () => {
