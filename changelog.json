@@ -13,7 +13,8 @@
       "Fixed the Pokédex seen and caught flags on Linux and macOS.",
       "Fixed Poké Ball catch rates on Linux and macOS.",
       "Fixed the blue background on the main menus and save screen stopping short of the sides in widescreen.",
-      "Fixed the PC menus leaving black bars at the sides in widescreen."
+      "Fixed the PC menus leaving black bars at the sides in widescreen.",
+      "Fixed the game crashing when entering a new area after playing for a long time."
     ]
   },
   "releases": [
