@@ -8,6 +8,9 @@
       "Crash reports: copy the newest report for a bug report, under Launcher. They stay on your computer."
     ],
     "game": [
+      "Fixed your partner walking behind you facing the wrong way on Linux and macOS.",
+      "Fixed battle timers always showing 0 on Linux and macOS.",
+      "Fixed the title menu's selection jumping to the next option instead of sliding on Linux and macOS.",
       "Fixed the game crashing as soon as its first logo movie started.",
       "Fixed items and Poké Balls saying they were meaningless to use in battle, and the bag jumping to another pocket afterwards.",
       "Fixed shop messages showing the wrong price and item, like nearly 2 billion for one Super Potion. Sales always paid the right amount.",
