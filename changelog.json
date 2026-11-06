@@ -8,6 +8,7 @@
       "Crash reports: copy the newest report for a bug report, under Launcher. They stay on your computer."
     ],
     "game": [
+      "Fixed a box appearing around the white ring in some battle moves. Their ripple effect now works too.",
       "Fixed your partner walking behind you facing the wrong way on Linux and macOS.",
       "Fixed battle timers always showing 0 on Linux and macOS.",
       "Fixed the title menu's selection jumping to the next option instead of sliding on Linux and macOS.",
