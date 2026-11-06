@@ -498,10 +498,10 @@ test('the Renderer list is saved with the others, Vulkan by default', async () =
   assert.equal(ui.calls.at(-1)[1].renderer, 'opengl');
 });
 
-test('a Mac offers Metal, as its default, and says why; other systems do not list it', async () => {
+test('Apple Silicon offers Metal, as its default, and says why; other systems do not list it', async () => {
   const mac = state();
-  mac.platform = port.platformInfo('darwin');
-  mac.config.settings = port.normalizeSettings({}, 'darwin');
+  mac.platform = port.platformInfo('darwin', 'arm64');
+  mac.config.settings = port.normalizeSettings({}, 'darwin', 'arm64');
   const ui = await renderer(mac);
   assert.equal(ui.elements.get('metal-renderer').hidden, false);
   assert.equal(ui.elements.get('renderer').value, 'metal');
@@ -512,6 +512,12 @@ test('a Mac offers Metal, as its default, and says why; other systems do not lis
   const other = await renderer(linux);
   assert.equal(other.elements.get('metal-renderer').hidden, true);
   assert.doesNotMatch(other.elements.get('renderer-note').textContent, /Metal/);
+  const intel = state();
+  intel.platform = port.platformInfo('darwin', 'x64');
+  intel.config.settings = port.normalizeSettings({}, 'darwin', 'x64');
+  const intelUi = await renderer(intel);
+  assert.equal(intelUi.elements.get('metal-renderer').hidden, true);
+  assert.equal(intelUi.elements.get('renderer').value, 'vulkan');
 });
 
 test('setup says where the build tools download, which is not the install location', async () => {

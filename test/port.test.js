@@ -43,29 +43,32 @@ test('a CISO is refused, as the port reads raw disc images only, and other forma
 });
 
 test('defaults are the port\'s HD settings on every system', () => {
-  for (const [platform, renderer] of [['linux', 'vulkan'], ['darwin', 'metal'], ['win32', 'vulkan']]) {
-    const settings = port.normalizeSettings({}, platform);
+  for (const [platform, arch, renderer] of [['linux', 'x64', 'vulkan'], ['darwin', 'arm64', 'metal'], ['darwin', 'x64', 'vulkan'], ['win32', 'x64', 'vulkan']]) {
+    const settings = port.normalizeSettings({}, platform, arch);
     assert.deepEqual([settings.renderer, settings.resolution, settings.frameRate, settings.widescreen, settings.anisotropic, settings.textures],
       [renderer, 4, 60, 'auto', 16, true]);
   }
 });
 
-test('only a Mac has Metal, and the game is told the renderer chosen', () => {
-  assert.deepEqual(port.platformInfo('darwin').renderers, ['metal', 'vulkan', 'opengl']);
+test('only Apple Silicon has Metal, and the game is told the renderer chosen', () => {
+  assert.deepEqual(port.platformInfo('darwin', 'arm64').renderers, ['metal', 'vulkan', 'opengl']);
+  assert.deepEqual(port.platformInfo('darwin', 'x64').renderers, ['vulkan', 'opengl']);
+  assert.equal(port.normalizeSettings({ renderer: 'metal' }, 'darwin', 'x64').renderer, 'vulkan');
   for (const platform of ['linux', 'win32']) assert.equal(port.normalizeSettings({ renderer: 'metal' }, platform).renderer, 'vulkan');
   for (const renderer of ['metal', 'vulkan', 'opengl']) {
-    const settings = port.normalizeSettings({ renderer }, 'darwin');
+    const settings = port.normalizeSettings({ renderer }, 'darwin', 'arm64');
     assert.equal(settings.renderer, renderer);
     assert.equal(port.buildEnvironment(settings, '/disc.iso', '/game').SMS_GX_BACKEND, renderer);
   }
 });
 
-test('a Mac moves off the old default Vulkan once, and a later choice stays', () => {
-  const vulkan = port.normalizeSettings({ renderer: 'vulkan' }, 'darwin');
-  assert.equal(port.moveToMetal(vulkan, undefined, 'darwin').renderer, 'metal');
-  assert.equal(port.moveToMetal(vulkan, true, 'darwin').renderer, 'vulkan');
-  const opengl = port.normalizeSettings({ renderer: 'opengl' }, 'darwin');
-  assert.equal(port.moveToMetal(opengl, undefined, 'darwin').renderer, 'opengl');
+test('Apple Silicon moves off the old default Vulkan once, a later choice stays, and an Intel Mac stays on Vulkan', () => {
+  const vulkan = port.normalizeSettings({ renderer: 'vulkan' }, 'darwin', 'arm64');
+  assert.equal(port.moveToMetal(vulkan, undefined, 'darwin', 'arm64').renderer, 'metal');
+  assert.equal(port.moveToMetal(vulkan, true, 'darwin', 'arm64').renderer, 'vulkan');
+  assert.equal(port.moveToMetal(vulkan, undefined, 'darwin', 'x64').renderer, 'vulkan');
+  const opengl = port.normalizeSettings({ renderer: 'opengl' }, 'darwin', 'arm64');
+  assert.equal(port.moveToMetal(opengl, undefined, 'darwin', 'arm64').renderer, 'opengl');
   const linux = port.normalizeSettings({ renderer: 'vulkan' }, 'linux');
   assert.equal(port.moveToMetal(linux, undefined, 'linux').renderer, 'vulkan');
 });

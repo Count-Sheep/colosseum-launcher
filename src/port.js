@@ -14,10 +14,10 @@ const TEXTURE_PACK = require('./texture-pack.json');
 
 // The game is built on the computer that plays it, for that computer: x86-64, and on a Mac with Apple
 // Silicon native arm64, drawn with Metal (the port's build.sh goes by the processor it runs on). The
-// first renderer is the system's default.
-function platformInfo(platform = process.platform) {
+// first renderer is the system's default. Metal is Apple Silicon's alone: an Intel Mac stays on Vulkan.
+function platformInfo(platform = process.platform, arch = process.arch) {
   if (platform === 'linux') return { name: 'Linux', id: 'linux', renderers: ['vulkan', 'opengl'] };
-  if (platform === 'darwin') return { name: 'macOS', id: 'macos', renderers: ['metal', 'vulkan', 'opengl'] };
+  if (platform === 'darwin') return { name: 'macOS', id: 'macos', renderers: arch === 'arm64' ? ['metal', 'vulkan', 'opengl'] : ['vulkan', 'opengl'] };
   if (platform === 'win32') return { name: 'Windows', id: 'windows', renderers: ['vulkan', 'opengl'] };
   throw new Error(`This port does not support ${platform}.`);
 }
@@ -85,8 +85,8 @@ function numberSetting(value, fallback, lo, hi) {
 }
 function choiceSetting(value, choices, fallback) { return choices.includes(value) ? value : fallback; }
 
-function normalizeSettings(input = {}, platform = process.platform) {
-  const info = platformInfo(platform);
+function normalizeSettings(input = {}, platform = process.platform, arch = process.arch) {
+  const info = platformInfo(platform, arch);
   const settings = {
     // How wide the 3D view is: as wide as the window, a fixed shape, or the original 4:3. Menus and movies keep their shape.
     widescreen: choiceSetting(input.widescreen, ['auto', '16:9', '16:10', '21:9', '4:3'], 'auto'),
@@ -150,11 +150,11 @@ function normalizeSettings(input = {}, platform = process.platform) {
   return settings;
 }
 
-// Metal became the Mac's renderer after Vulkan: a Vulkan saved before that was the default, not a
+// Metal became Apple Silicon's renderer after Vulkan: a Vulkan saved before that was the default, not a
 // choice, so it moves over once. `moved` is the config's own flag, as the settings hold only what
 // Settings shows: a player who goes back to Vulkan afterwards stays there.
-function moveToMetal(settings, moved, platform = process.platform) {
-  return platform === 'darwin' && !moved && settings.renderer === 'vulkan' ? { ...settings, renderer: 'metal' } : settings;
+function moveToMetal(settings, moved, platform = process.platform, arch = process.arch) {
+  return platformInfo(platform, arch).renderers[0] === 'metal' && !moved && settings.renderer === 'vulkan' ? { ...settings, renderer: 'metal' } : settings;
 }
 
 function texturePackDirectory(root) { return path.join(root, 'mods', 'textures'); }
