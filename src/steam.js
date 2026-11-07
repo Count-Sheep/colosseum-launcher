@@ -383,8 +383,22 @@ function addShortcut({ root, accounts, exe, startDir, appName = APP_NAME, launch
   });
 }
 
+// Stop in Steam sends SIGTERM to everything it started at once, and on Linux that
+// includes the process serving the AppImage's mount, so the launcher's code goes
+// away under it. Electron answers SIGTERM with a normal quit, which runs code that
+// hasn't been read yet, and reading it then fails with a SIGBUS crash report.
+// Dropping the last Node listener for a signal puts back its default action, so
+// the system ends the launcher without running any of it. Only for a launcher Steam
+// started: a SIGTERM for the launcher alone needs the normal quit, which closes
+// Electron's helper processes before the mount goes.
+function endOnSigterm(target = process) {
+  const listener = () => {};
+  target.on('SIGTERM', listener);
+  target.removeListener('SIGTERM', listener);
+}
+
 module.exports = {
   APP_NAME, ARTWORK, MAP, STRING, INT32, parseVdf, serializeVdf, shortcutAppId, upsertShortcut,
   steamRoots, registrySteamPath, findSteam, steamAccounts, downloadArtwork, hasShortcut, shortcutLaunchOptions, skipsLauncher, missingOptions,
-  isSteamOS, checkedVdf, snapshotShortcuts, describeShortcuts, addShortcut
+  isSteamOS, checkedVdf, snapshotShortcuts, describeShortcuts, addShortcut, endOnSigterm
 };

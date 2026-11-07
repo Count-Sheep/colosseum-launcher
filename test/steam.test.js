@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 const steam = require('../src/steam');
 const { MAP, STRING, INT32 } = steam;
 
@@ -315,4 +316,16 @@ test('a shortcut is missing launch options until it has every one of them', () =
   assert.equal(steam.missingOptions('--play', '--no-sandbox'), true);
   assert.equal(steam.missingOptions('--play --no-sandbox', '--no-sandbox'), false);
   assert.equal(steam.missingOptions(null, ''), false);
+});
+
+// Electron answers SIGTERM with a quit, which a Stop in Steam must not run (endOnSigterm in steam.js).
+// A shell's ignored signal stands in for that handler: only the default action ends this child.
+test('endOnSigterm gives SIGTERM back to the system', { skip: process.platform === 'win32' }, async () => {
+  const script = `require(${JSON.stringify(path.resolve(__dirname, '../src/steam'))}).endOnSigterm();
+    process.stdout.write('ready'); setTimeout(() => process.exit(7), 30000);`;
+  const child = spawn('sh', ['-c', `trap '' TERM; exec "$0" -e "$1"`, process.execPath, script], { stdio: ['ignore', 'pipe', 'inherit'] });
+  await new Promise(resolve => child.stdout.once('data', resolve));
+  child.kill('SIGTERM');
+  const [code, signal] = await new Promise(resolve => child.once('exit', (...result) => resolve(result)));
+  assert.deepEqual([code, signal], [null, 'SIGTERM']);
 });
