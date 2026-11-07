@@ -19,9 +19,21 @@ test('off, nothing reaches the game, and no seed is made', () => {
 });
 
 test('the setting says the seed, what changes and which generations', () => {
-  assert.equal(randomizer.environmentValue(on()), 'C0FFEE11:15:7');
-  assert.equal(randomizer.environmentValue(on({ randomizerGifts: false, randomizerSimilar: true })), 'C0FFEE11:23:7');
-  assert.equal(randomizer.environmentValue(on({ randomizerNoLegendaries: true, randomizerGen2: false })), 'C0FFEE11:47:5');
+  assert.equal(randomizer.environmentValue(on()), 'C0FFEE11:19:7');
+  assert.equal(randomizer.environmentValue(on({ randomizerTrainers: true, randomizerGifts: true })), 'C0FFEE11:31:7');
+  assert.equal(randomizer.environmentValue(on({ randomizerNoLegendaries: true, randomizerGen2: false })), 'C0FFEE11:51:5');
+});
+
+test('by default a run changes the starters and Shadow Pokémon, from every generation, at similar strength', () => {
+  const { randomizerStarters, randomizerShadow, randomizerTrainers, randomizerGifts, randomizerSimilar, randomizerNoLegendaries,
+    randomizerGen1, randomizerGen2, randomizerGen3 } = randomizer.normalize({});
+  assert.deepEqual({ randomizerStarters, randomizerShadow, randomizerTrainers, randomizerGifts, randomizerSimilar, randomizerNoLegendaries },
+    { randomizerStarters: true, randomizerShadow: true, randomizerTrainers: false, randomizerGifts: false, randomizerSimilar: true, randomizerNoLegendaries: false });
+  assert.deepEqual([randomizerGen1, randomizerGen2, randomizerGen3], [true, true, true]);
+});
+
+test('similar strength can be turned off', () => {
+  assert.equal(randomizer.environmentValue(on({ randomizerSimilar: false })), 'C0FFEE11:3:7');
 });
 
 test('turning it on makes a seed, and a seed the player typed is kept', () => {
@@ -32,7 +44,7 @@ test('turning it on makes a seed, and a seed the player typed is kept', () => {
 
 test('a run needs a generation, so choosing none means all of them', () => {
   const settings = on({ randomizerGen1: false, randomizerGen2: false, randomizerGen3: false });
-  assert.equal(randomizer.environmentValue(settings), 'C0FFEE11:15:7');
+  assert.equal(randomizer.environmentValue(settings), 'C0FFEE11:19:7');
 });
 
 test('with nothing to change, a new save is the normal game', () => {
@@ -43,7 +55,7 @@ test('with nothing to change, a new save is the normal game', () => {
 test('the game is told only when it is on', () => {
   const env = settings => port.buildEnvironment(port.normalizeSettings(settings), '/disc.iso', '/game');
   assert.equal(env({}).COLO_RANDOMIZER, undefined);
-  assert.equal(env({ randomizer: true, randomizerSeed: 'C0FFEE11' }).COLO_RANDOMIZER, 'C0FFEE11:15:7');
+  assert.equal(env({ randomizer: true, randomizerSeed: 'C0FFEE11' }).COLO_RANDOMIZER, 'C0FFEE11:19:7');
 });
 
 // A save's slot as the game writes it: the header, then the body scrambled against its own hash.

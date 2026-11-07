@@ -32,8 +32,8 @@ function normalizeSeed(input) {
 function normalize(input = {}) {
   const settings = { randomizer: Boolean(input.randomizer), randomizerSeed: normalizeSeed(input.randomizerSeed),
     randomizerStarters: input.randomizerStarters !== false, randomizerShadow: input.randomizerShadow !== false,
-    randomizerTrainers: input.randomizerTrainers !== false, randomizerGifts: input.randomizerGifts !== false,
-    randomizerSimilar: Boolean(input.randomizerSimilar), randomizerNoLegendaries: Boolean(input.randomizerNoLegendaries),
+    randomizerTrainers: Boolean(input.randomizerTrainers), randomizerGifts: Boolean(input.randomizerGifts),
+    randomizerSimilar: input.randomizerSimilar !== false, randomizerNoLegendaries: Boolean(input.randomizerNoLegendaries),
     randomizerGen1: input.randomizerGen1 !== false, randomizerGen2: input.randomizerGen2 !== false, randomizerGen3: input.randomizerGen3 !== false };
   if (!settings.randomizerGen1 && !settings.randomizerGen2 && !settings.randomizerGen3)
     settings.randomizerGen1 = settings.randomizerGen2 = settings.randomizerGen3 = true;
