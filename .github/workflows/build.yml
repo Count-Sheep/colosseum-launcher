@@ -149,6 +149,7 @@ jobs:
               const file = "src/game-release.json";
               const game = JSON.parse(fs.readFileSync(file, "utf8"));
               Object.assign(game, { version: GAME_VERSION, commit: GAME, decomp: DECOMP });
+              delete game.rosetta;
               if (RENDERER) Object.assign(game.renderer, { commit: RENDERER, decomp: RENDERER_DECOMP });
               else delete game.renderer;
               fs.writeFileSync(file, JSON.stringify(game, null, 2) + "\n");

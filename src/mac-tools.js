@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const release = require('./game-release.json');
 
 function executable(file) {
   try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); }
@@ -85,28 +86,31 @@ async function linkableSdk(defaultSdk, env, run, list, arch) {
 
 // timeout: how long each tool may take to start. Freshly unpacked programs can
 // take seconds the first time, while macOS checks them.
-async function inspect(base = process.env, { run = probe, exists = executable, list = listSdks, timeout = 10000, cpu = process.arch } = {}) {
+// rosetta: the game is x86-64 on every Mac, so Apple Silicon needs Rosetta 2 (port.js, gameArch).
+async function inspect(base = process.env, { run = probe, exists = executable, list = listSdks, timeout = 10000, cpu = process.arch, rosetta: needsRosetta = release.rosetta } = {}) {
   const env = environment(base, exists);
   const runTool = (command, args) => {
     const file = find(command, env, exists);
     return file ? run(file, args, env, timeout) : { ok: false, stdout: '', problem: `${command} not found` };
   };
-  const [sdk, cmake, objcopy, nm, lld, brew] = await Promise.all([
+  const [sdk, silicon, cmake, objcopy, nm, lld, brew] = await Promise.all([
     run('/usr/bin/xcrun', ['--sdk', 'macosx', '--show-sdk-path'], env, timeout),
+    needsRosetta ? run('/usr/sbin/sysctl', ['-n', 'hw.optional.arm64'], env, timeout) : { stdout: '' },
     runTool('cmake', ['--version']), runTool('llvm-objcopy', ['--version']), runTool('llvm-nm', ['--version']), runTool('ld.lld', ['--version']),
     // Homebrew is useful for fixing missing packages, but is not itself required.
     Promise.resolve(Boolean(find('brew', env, exists)))
   ]);
-  const [appleCommands, python, compilers] = await Promise.all([
+  const [appleCommands, python, rosetta, compilers] = await Promise.all([
     sdk.ok ? Promise.all(['git', 'make', 'patch'].map(command => runTool(command, ['--version']))) : [],
     // Apple's Python stub can trigger an installation prompt without an SDK.
     sdk.ok || find('python3', env, exists) !== '/usr/bin/python3'
       ? runTool('python3', ['--version']) : { ok: false },
+    silicon.stdout === '1' ? run('/usr/bin/arch', ['-x86_64', '/usr/bin/true'], env, timeout) : { ok: true },
     Promise.all(['clang', 'clang++'].map(command => sdk.ok || find(command, env, exists) !== `/usr/bin/${command}`
       ? runTool(command, ['--version']) : { ok: false }))
   ]);
   const sdkPath = sdk.ok && sdk.stdout
-    ? await linkableSdk(sdk.stdout, env, (...args) => run(...args, timeout), list, cpu === 'arm64' ? 'arm64' : 'x86_64') : '';
+    ? await linkableSdk(sdk.stdout, env, (...args) => run(...args, timeout), list, cpu === 'arm64' && !needsRosetta ? 'arm64' : 'x86_64') : '';
   const cmakeVersion = cmake.stdout.match(/cmake version (\d+)\.(\d+)/);
   const cmakeReady = cmake.ok && Boolean(cmakeVersion) &&
     (Number(cmakeVersion[1]) > 3 || Number(cmakeVersion[1]) === 3 && Number(cmakeVersion[2]) >= 20);
@@ -121,7 +125,8 @@ async function inspect(base = process.env, { run = probe, exists = executable, l
         problem: cmakeReady ? undefined : problem(cmake) || `cmake is too old: ${cmake.stdout.split('\n')[0]}` },
       { id: 'python', label: 'Python 3', package: 'python3', ready: python.ok, problem: problem(python) },
       { id: 'llvm', label: 'LLVM build tools', package: 'llvm lld', ready: objcopy.ok && nm.ok && lld.ok && compilers.every(result => result.ok),
-        problem: problem(objcopy, nm, lld, ...compilers) }
+        problem: problem(objcopy, nm, lld, ...compilers) },
+      ...(silicon.stdout === '1' ? [{ id: 'rosetta', label: 'Rosetta 2', ready: rosetta.ok }] : [])
     ]
   };
 }
@@ -131,6 +136,7 @@ function report(inspection = { checked: false, requirements: [] }, { managed = f
   const missing = requirements.filter(item => !item.ready && !item.optional);
   const commands = [];
   if (missing.some(item => item.id === 'apple')) commands.push('xcode-select --install');
+  if (missing.some(item => item.id === 'rosetta')) commands.push('softwareupdate --install-rosetta');
   const packages = managed ? [] : missing.filter(item => item.package).map(item => item.package);
   if (packages.length) commands.push(`brew install ${packages.join(' ')}`);
   return { ...inspection, requirements, ready: inspection.checked && missing.length === 0,

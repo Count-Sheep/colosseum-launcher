@@ -10,7 +10,7 @@ What the port builds with, on every system: a pinned clang for the game code (zi
 
 ## macOS setup
 
-Step 1 checks Apple's tools and shows a guided checklist with a copyable Terminal command when needed: `xcode-select --install`. The game is native on both kinds of Mac (arm64 on Apple Silicon), so Rosetta is not needed. Click **Check again** in Mac setup help, then continue Step 1. The launcher does not run system installers or accept Apple's licenses automatically.
+Step 1 checks Apple's tools and shows a guided checklist with a copyable Terminal command when needed: `xcode-select --install`. The game is native on both kinds of Mac (arm64 on Apple Silicon), so Rosetta is not needed, unless `src/game-release.json` marks the game `"rosetta"`: then setup also checks for Rosetta and shows `softwareupdate --install-rosetta`. Click **Check again** in Mac setup help, then continue Step 1. The launcher does not run system installers or accept Apple's licenses automatically.
 
 ## Publish a new toolset
 

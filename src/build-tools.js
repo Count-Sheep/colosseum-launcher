@@ -237,7 +237,7 @@ function status(userData, platform = process.platform, env = process.env, option
   if (platform === 'darwin') {
     const found = macTools.report(macInspection, { ...options, managed: true });
     const installed = privateReady(userData, platform);
-    const appleReady = found.checked && found.requirements.filter(item => item.id === 'apple' && !item.optional)
+    const appleReady = found.checked && found.requirements.filter(item => ['apple', 'rosetta'].includes(item.id) && !item.optional)
       .every(item => item.ready);
     return { ...found, ready: appleReady && installed && found.ready,
       mode: appleReady && installed && found.ready ? 'private' : 'missing',

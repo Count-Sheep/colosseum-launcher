@@ -50,6 +50,16 @@ test('defaults are the port\'s HD settings on every system', () => {
   }
 });
 
+test('a game marked for Rosetta is x86-64 on every Mac, so Apple Silicon has no Metal until the mark goes', () => {
+  assert.equal(port.gameArch('arm64', { rosetta: true }), 'x64');
+  assert.equal(port.gameArch('arm64', {}), 'arm64');
+  assert.equal(port.gameArch('x64', {}), 'x64');
+  const arch = port.gameArch('arm64', { rosetta: true });
+  assert.deepEqual(port.platformInfo('darwin', arch).renderers, ['vulkan', 'opengl']);
+  assert.equal(port.normalizeSettings({ renderer: 'metal' }, 'darwin', arch).renderer, 'vulkan');
+  assert.equal(port.moveToMetal(port.normalizeSettings({ renderer: 'vulkan' }, 'darwin', arch), undefined, 'darwin', arch).renderer, 'vulkan');
+});
+
 test('only Apple Silicon has Metal, and the game is told the renderer chosen', () => {
   assert.deepEqual(port.platformInfo('darwin', 'arm64').renderers, ['metal', 'vulkan', 'opengl']);
   assert.deepEqual(port.platformInfo('darwin', 'x64').renderers, ['vulkan', 'opengl']);

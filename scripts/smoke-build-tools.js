@@ -35,8 +35,8 @@ function executableType(file) {
     return 'unknown';
   } finally { fs.closeSync(fd); }
 }
-// (a Mac's game is native: its build goes by the processor it runs on)
-const EXPECTED = { linux: 'ELF x86-64', win32: 'PE x86-64', darwin: process.arch === 'arm64' ? 'Mach-O arm64' : 'Mach-O x86-64' };
+// (a Mac's game goes by the processor it runs on, unless it is a game for Rosetta: port.js, gameArch)
+const EXPECTED = { linux: 'ELF x86-64', win32: 'PE x86-64', darwin: port.gameArch() === 'arm64' ? 'Mach-O arm64' : 'Mach-O x86-64' };
 
 // Some players' System32 holds older DLLs named like the build tools' own (libwinpthread-1.dll, zlib1.dll...),
 // which Windows loads before the PATH's: GCC then fails without a message. A real system DLL under those names

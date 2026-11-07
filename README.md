@@ -55,7 +55,7 @@ The launcher walks you through three steps:
 2. **Choose disc image.** Select a copy of your own original North American Pokémon Colosseum disc: **GC6E01, revision 0**. Supported files are `.iso` and `.gcm`. Compressed formats (CISO, RVZ, GCZ) need converting to ISO first, which Dolphin does with **Convert File**. The bonus disc is not the game.
 3. **Begin setup.** The launcher downloads HD textures and builds the game on your computer. This first setup can take a while.
 
-On Mac, setup may ask you to install Apple's Command Line Tools. Follow **Mac setup help** in the launcher. The game is built for your Mac: on Apple Silicon it is a native program that draws with Metal, with no Rosetta needed.
+On Mac, setup may ask you to install Apple's Command Line Tools. Follow **Mac setup help** in the launcher. The game is built for your Mac: on Apple Silicon, Beta's game is a native program that draws with Metal, with no Rosetta needed. Stable's game still runs through Rosetta, and setup asks for it.
 
 The progress bar shows what's happening. **View build log** opens more detail; closing that view keeps setup running. When setup finishes, press **Play**.
 
@@ -179,7 +179,7 @@ Each published Beta is announced in Discord when the `DISCORD_BETA_WEBHOOK` repo
 
 Pushing a higher `version` in `package.json` to `main` releases it: `release.yml` makes the tag and a draft, packages all three systems and attaches the tool archives while it requires the pinned game to build everywhere (`game-build.yml`), then publishes. That build is skipped when the pull request merged for the release already passed it on every system with exactly the same files, so let its checks finish before merging for a faster release.
 
-`npm run update:game` selects the newest commit of the port's branch and the decomp and renderer commits it pins, bumps the version and drafts the changelog. See [AGENTS.md](AGENTS.md) for the changelog's rules.
+`npm run update:game` selects the newest commit of the port's branch and the decomp and renderer commits it pins, bumps the version and drafts the changelog. Stable stays on the x86_64 game until then: `"rosetta": true` in `src/game-release.json` marks a game from before the native Apple Silicon build, and on that mark the launcher keeps Rosetta and Vulkan and CI expects x86_64. Beta's build drops the mark, and so does moving the pin, which brings Apple Silicon to Stable. See [AGENTS.md](AGENTS.md) for the changelog's rules.
 
 ### Launcher updates and Mac signing
 

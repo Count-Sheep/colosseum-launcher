@@ -180,7 +180,8 @@ function loadConfig() {
     repo: typeof saved.repo === 'string' ? saved.repo : defaultRepo(),
     rom: typeof saved.rom === 'string' ? saved.rom : '',
     settings: port.moveToMetal(port.normalizeSettings(saved.settings || {}), saved.movedToMetal),
-    movedToMetal: true,
+    // Only once Metal is on offer: a Mac still on a Rosetta game moves when its game turns native.
+    movedToMetal: Boolean(saved.movedToMetal) || port.platformInfo().renderers[0] === 'metal',
     installRoot: typeof saved.installRoot === 'string' ? saved.installRoot : null,
     previousInstall: saved.previousInstall || null,
     completedSetup: Boolean(saved.completedSetup),

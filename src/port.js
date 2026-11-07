@@ -11,11 +11,17 @@ const { describe } = require('./disc');
 const PORT_URL = 'https://git.softwareauralabs.com/chase/pokemon-colosseum.git';
 // The HD texture pack: the port's own release, unpacked into mods/textures/colo-upscale-4x.
 const TEXTURE_PACK = require('./texture-pack.json');
+const release = require('./game-release.json');
+
+// The processor the game is built for. A game marked "rosetta" in game-release.json predates the native
+// build: it is x86-64 everywhere, and a Mac with Apple Silicon runs it through Rosetta 2. Stable keeps
+// that game until its pin moves; Beta's newest game has no mark (scripts/pin-game.js).
+function gameArch(cpu = process.arch, game = release) { return game.rosetta ? 'x64' : cpu; }
 
 // The game is built on the computer that plays it, for that computer: x86-64, and on a Mac with Apple
 // Silicon native arm64, drawn with Metal (the port's build.sh goes by the processor it runs on). The
 // first renderer is the system's default. Metal is Apple Silicon's alone: an Intel Mac stays on Vulkan.
-function platformInfo(platform = process.platform, arch = process.arch) {
+function platformInfo(platform = process.platform, arch = gameArch()) {
   if (platform === 'linux') return { name: 'Linux', id: 'linux', renderers: ['vulkan', 'opengl'] };
   if (platform === 'darwin') return { name: 'macOS', id: 'macos', renderers: arch === 'arm64' ? ['metal', 'vulkan', 'opengl'] : ['vulkan', 'opengl'] };
   if (platform === 'win32') return { name: 'Windows', id: 'windows', renderers: ['vulkan', 'opengl'] };
@@ -85,7 +91,7 @@ function numberSetting(value, fallback, lo, hi) {
 }
 function choiceSetting(value, choices, fallback) { return choices.includes(value) ? value : fallback; }
 
-function normalizeSettings(input = {}, platform = process.platform, arch = process.arch) {
+function normalizeSettings(input = {}, platform = process.platform, arch = gameArch()) {
   const info = platformInfo(platform, arch);
   const settings = {
     // How wide the 3D view is: as wide as the window, a fixed shape, or the original 4:3. Menus and movies keep their shape.
@@ -153,7 +159,7 @@ function normalizeSettings(input = {}, platform = process.platform, arch = proce
 // Metal became Apple Silicon's renderer after Vulkan: a Vulkan saved before that was the default, not a
 // choice, so it moves over once. `moved` is the config's own flag, as the settings hold only what
 // Settings shows: a player who goes back to Vulkan afterwards stays there.
-function moveToMetal(settings, moved, platform = process.platform, arch = process.arch) {
+function moveToMetal(settings, moved, platform = process.platform, arch = gameArch()) {
   return platformInfo(platform, arch).renderers[0] === 'metal' && !moved && settings.renderer === 'vulkan' ? { ...settings, renderer: 'metal' } : settings;
 }
 
@@ -345,7 +351,7 @@ function gameRuntimeFolders(environment = process.env) {
   return [path.join(environment.MSYS2_ROOT || 'C:\\msys64', 'mingw64', 'bin')];
 }
 
-module.exports = { PORT_URL, TEXTURE_PACK, platformInfo, dependencyPaths, isPort, validateRom, normalizeSettings, moveToMetal,
+module.exports = { PORT_URL, TEXTURE_PACK, gameArch, platformInfo, dependencyPaths, isPort, validateRom, normalizeSettings, moveToMetal,
   texturePackDirectory, texturePackInstalled, hdVisualsInstalled, customTextureDirectory, customTexturesPresent, texturePackFolders,
   buildEnvironment, binaryPath, longPathProblem, playableInstall, useLauncherScripts, launcherScript,
   buildCommand, textureCommand, gameRunCommand, gameRuntimeFolders };

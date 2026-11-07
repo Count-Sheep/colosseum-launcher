@@ -50,8 +50,10 @@ try {
     const headers = renderer ? rendererHeaders(OLDER_RENDERER.repository, renderer) : null;
     const date = new Date().toISOString().slice(0, 10).replaceAll('-', '.');
     const number = current.version.startsWith(`${date}.`) ? Number(current.version.split('.').at(-1)) + 1 : 1;
-    const { renderer: _, ...rest } = current;
-    const next = { ...rest, version: `${date}.${number}`, commit, decomp, ...(renderer && {
+    const { renderer: _, rosetta: __, ...rest } = current;
+    // A game from before the native Apple Silicon build keeps Rosetta (src/port.js, gameArch).
+    const rosetta = !git(['ls-tree', commit, 'ext/sms_gx/src/mtl']);
+    const next = { ...rest, version: `${date}.${number}`, commit, decomp, ...(rosetta && { rosetta }), ...(renderer && {
       renderer: { ...OLDER_RENDERER, commit: renderer, decomp: headers.decomp, decompRepository: headers.decompRepository || OLDER_RENDERER.decompRepository } }) };
     fs.writeFileSync(path.join(launcherRoot, 'src', 'game-release.json'), `${JSON.stringify(next, null, 2)}\n`);
     execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['version', 'patch', '--no-git-tag-version'],

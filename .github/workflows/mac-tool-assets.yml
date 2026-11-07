@@ -35,6 +35,12 @@ jobs:
         run: node -e 'if (process.arch !== process.env.EXPECTED_ARCH) process.exit(1)'
         env:
           EXPECTED_ARCH: ${{ matrix.arch }}
+      - name: Enable Intel execution on the Apple Silicon runner, for a game that needs it
+        if: (inputs.arch == 'all' || inputs.arch == matrix.arch) && matrix.arch == 'arm64'
+        run: |
+          if [ "$(node -p "require('./src/game-release.json').rosetta === true")" = true ]; then
+            sudo softwareupdate --install-rosetta --agree-to-license
+          fi
       - name: Package private tools and corresponding sources
         if: inputs.arch == 'all' || inputs.arch == matrix.arch
         run: node scripts/package-build-tools.js
