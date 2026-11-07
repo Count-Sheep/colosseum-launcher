@@ -10,6 +10,7 @@
       "Macs with Apple Silicon: the game now builds as a native program and draws with Metal, so it runs faster and Rosetta is no longer needed. Metal is the new default renderer on these Macs; Vulkan and OpenGL are still under Graphics. Intel Macs stay on Vulkan."
     ],
     "game": [
+      "When Vulkan can't start on Linux, the game now tries the desktop's other window system before falling back to OpenGL, and the message says why Vulkan couldn't start.",
       "Battle animations can run at any speed from 1× to 5× in steps of 0.1.",
       "Online battles: two players' games play one battle, with both choosing their moves at the same time, from the launcher's Online tab.",
       "Randomizer: a new save can be a randomized run, and the save keeps its seed.",
