@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('colo', {
     if (filePaths?.some(filePath => !filePath)) throw new Error('Drop .gci files from your computer.');
     return ipcRenderer.invoke('import-dolphin-save', filePaths);
   },
+  exportGciSave: () => ipcRenderer.invoke('export-gci-save'),
   restoreSaves: id => ipcRenderer.invoke('restore-saves', id),
   openBackups: () => ipcRenderer.invoke('open-backups'),
   showPathFolder: () => ipcRenderer.invoke('show-path-folder'),

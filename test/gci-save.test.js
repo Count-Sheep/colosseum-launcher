@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { convertGci, readGci, readGciFiles, importGci } = require('../src/gci-save');
+const { EXPORT_NAME, convertGci, readGci, readGciFiles, importGci, readCardSave, writeGci } = require('../src/gci-save');
 const saves = require('../src/saves');
 
 const BLOCK = 0x2000, SLOT_START = 0x6000, SLOT_SIZE = 0x1e000, HASHED = 0x1dfd8, HASH = 0x1dfec;
@@ -264,4 +264,98 @@ test('a failed import puts the card back and leaves nothing behind', t => {
   assert.equal(fs.readFileSync(path.join(card, 'pokemon_colosseum.dat'), 'utf8'), 'current save');
   assert.equal(fs.readFileSync(path.join(card, 'pokemon_colosseum.stat'), 'utf8'), 'current stat');
   assert.deepEqual(fs.readdirSync(card).sort(), ['pokemon_colosseum.dat', 'pokemon_colosseum.stat']);
+});
+
+// A card holding a save the way the port leaves it: the .dat, and nothing else this needs.
+function card(t, bytes = fixture()) {
+  const dir = tempDir(t);
+  fs.writeFileSync(path.join(dir, 'pokemon_colosseum.dat'), bytes.subarray(0x40));
+  return dir;
+}
+
+test('exports the card data unchanged behind the header the console keeps', t => {
+  const dir = card(t);
+  const { gci, trainer, damaged } = readCardSave(dir);
+  assert.equal(gci.length, 0x40 + 48 * BLOCK);
+  assert.deepEqual(gci.subarray(0x40), fixture().subarray(0x40));
+  // The header Dolphin wrote when the original game created its save, with this export's time.
+  const retail = Buffer.from([
+    '474336453031ff02706f6b656d6f6e5f',
+    '636f6c6f737365756d00000000000000',
+    '00000000000000000000003700000040',
+    '5555aaaa1c0000050030ffff00000000'].join(''), 'hex');
+  assert.equal(retail.length, 0x40);
+  gci.copy(retail, 0x28, 0x28, 0x2c);
+  assert.deepEqual(gci.subarray(0, 0x40), retail);
+  assert.equal(trainer, 'WES');
+  assert.equal(damaged, 0);
+});
+
+test('an exported save imports back to the same save', t => {
+  const dir = card(t);
+  const { gci } = readCardSave(dir);
+  const converted = convertGci(gci);
+  assert.deepEqual(converted.data, fs.readFileSync(path.join(dir, 'pokemon_colosseum.dat')));
+  assert.equal(converted.trainer, 'WES');
+  const expected = convertGci(fixture()).stat;
+  expected.writeUInt32BE(gci.readUInt32BE(0x28), 0x24);
+  assert.deepEqual(converted.stat, expected);
+});
+
+test('dates an export by when the game last wrote the save', t => {
+  const dir = card(t);
+  const when = new Date(2026, 10, 7, 12, 30, 15);
+  fs.utimesSync(path.join(dir, 'pokemon_colosseum.dat'), when, when);
+  const seconds = readCardSave(dir).gci.readUInt32BE(0x28);
+  assert.equal(new Date(Date.UTC(2000, 0, 1) + seconds * 1000).toISOString(), '2026-11-07T12:30:15.000Z');
+});
+
+test('says when there is nothing to export', t => {
+  assert.throws(() => readCardSave(tempDir(t)), /no Pokémon Colosseum save to export/);
+  assert.throws(() => readCardSave(card(t, fixture([0, 0, 0]))), error => error.code === 'NO_PROGRESS');
+});
+
+test('a damaged save points at the backups, not at Dolphin', t => {
+  const short = tempDir(t);
+  fs.writeFileSync(path.join(short, 'pokemon_colosseum.dat'), Buffer.alloc(BLOCK));
+  assert.throws(() => readCardSave(short), /Restore a backup/);
+  const bytes = fixture();
+  damage(bytes, 0); damage(bytes, 1); damage(bytes, 2);
+  assert.throws(() => readCardSave(card(t, bytes)), /none of its three copies.*Restore a backup/);
+});
+
+test('exports a save whose newest copy is damaged, and says so', t => {
+  const bytes = fixture();
+  damage(bytes, 2);
+  const { gci, damaged } = readCardSave(card(t, bytes));
+  assert.equal(damaged, 1);
+  assert.deepEqual(gci.subarray(0x40), bytes.subarray(0x40));
+});
+
+test('writes under the name Dolphin uses, replacing the chosen file', t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, EXPORT_NAME);
+  assert.equal(EXPORT_NAME, '01-GC6E-pokemon_colosseum.gci');
+  fs.writeFileSync(file, 'older export');
+  assert.equal(writeGci(Buffer.from('new'), file), file);
+  assert.equal(fs.readFileSync(file, 'utf8'), 'new');
+  assert.deepEqual(fs.readdirSync(dir), [EXPORT_NAME]);
+});
+
+test('adds the extension, but never to replace a file the dialog did not ask about', t => {
+  const dir = tempDir(t);
+  const file = writeGci(Buffer.from('new'), path.join(dir, 'wes'));
+  assert.equal(file, path.join(dir, 'wes.gci'));
+  assert.throws(() => writeGci(Buffer.from('other'), path.join(dir, 'wes')), /wes\.gci already exists/);
+  assert.equal(fs.readFileSync(file, 'utf8'), 'new');
+});
+
+test('a failed export keeps the file it would have replaced and leaves nothing behind', t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, EXPORT_NAME);
+  fs.writeFileSync(file, 'older export');
+  t.mock.method(fs, 'renameSync', () => { throw new Error('disk full'); });
+  assert.throws(() => writeGci(Buffer.from('new'), file), /disk full/);
+  assert.equal(fs.readFileSync(file, 'utf8'), 'older export');
+  assert.deepEqual(fs.readdirSync(dir), [EXPORT_NAME]);
 });

@@ -13,6 +13,10 @@ const CARD_BLOCKS = 59; // host/card.c
 const NAME = 'pokemon_colosseum';
 const GAME = 'GC6E01';
 const TITLE = 'Pokémon Colosseum';
+const EXPORT_NAME = `01-${GAME.slice(0, 4)}-${NAME}.gci`; // the name Dolphin gives it
+const RESTORE = 'Restore a backup from the Saves tab, then try again.';
+const PERMISSIONS = 0x1c; // public, as every card file starts, then no copy and no move, which the game adds
+const FIRST_BLOCK = 5; // the first block after a card's system blocks: where the file would be on an empty card
 
 // The save file (memcard.c in the decomp): banner and icon, then three slots the game writes in turn. Each slot opens
 // with a plain header, and the rest is scrambled against the SHA-1 of the whole that it keeps at HASH.
@@ -76,14 +80,15 @@ function summary(plain, count) {
   return { trainer: text(plain, TRAINER), party, saveCount: count };
 }
 
-// The slot the game will load: the newest whose hash holds, as it falls back from a damaged one.
-function newestPlain(data) {
+// The slot the game will load: the newest whose hash holds, as it falls back from a damaged one. fix is what to do
+// about a damaged save, which depends on where it came from.
+function newestPlain(data, fix = 'Export the save again from Dolphin.') {
   const slots = [];
   for (let i = 0; i < SLOTS; i++) {
     const start = SLOT_START + i * SLOT_SIZE;
     const slot = data.subarray(start, start + SLOT_SIZE);
     if (!headerValid(slot))
-      throw new Error('This save is damaged: the game would not open it. Export the save again from Dolphin.');
+      throw new Error(`This save is damaged: the game would not open it. ${fix}`);
     slots.push({ slot, count: slot.readInt32BE(4) });
   }
   const written = slots.filter(item => item.count > 0).sort((a, b) => b.count - a.count);
@@ -93,11 +98,11 @@ function newestPlain(data) {
     const plain = unscramble(slot);
     if (plain) return { plain, count, damaged };
   }
-  throw new Error('This save is damaged: none of its three copies can be read. Export the save again from Dolphin.');
+  throw new Error(`This save is damaged: none of its three copies can be read. ${fix}`);
 }
 
-function newestSave(data) {
-  const { plain, count, damaged } = newestPlain(data);
+function newestSave(data, fix) {
+  const { plain, count, damaged } = newestPlain(data, fix);
   return { ...summary(plain, count), damaged };
 }
 
@@ -213,4 +218,51 @@ function importGci(converted, saveDir, backups = saves.backupRoot()) {
   return { name: converted.name, directory: saveDir, previous: previous.directory || null };
 }
 
-module.exports = { convertGci, readGci, readGciFiles, importGci, newestPlain };
+// The directory entry the console would hold for this save. The game sets the banner, icons and comment the same way
+// for every save (memcard.c, states 15 and 23). The .stat isn't used: the port ignores the permissions the game asks
+// for, and leaves the time at zero or at an import's, however long the save has been played since.
+function gciHeader(modified) {
+  const header = Buffer.alloc(HEADER);
+  header.write(GAME, 0, 'latin1');
+  header[6] = 0xff; // unused
+  header[7] = 2; // banner format
+  header.write(NAME, 8, 'latin1');
+  // The console's clock has no time zone: seconds since 2000 began, as a wall clock read them.
+  const local = modified.getTime() - modified.getTimezoneOffset() * 60000;
+  header.writeUInt32BE(Math.max(0, Math.floor((local - Date.UTC(2000, 0, 1)) / 1000)), 0x28);
+  header.writeUInt32BE(0x40, 0x2c); // icon address
+  header.writeUInt16BE(0x5555, 0x30); // icon format
+  header.writeUInt16BE(0xaaaa, 0x32); // icon speed
+  header[0x34] = PERMISSIONS;
+  header.writeUInt16BE(FIRST_BLOCK, 0x36);
+  header.writeUInt16BE(BLOCKS, 0x38);
+  header.writeUInt16BE(0xffff, 0x3a); // unused
+  return header; // the comment address stays 0
+}
+
+// Reads the port's save as a .gci, the reverse of convertGci: the card data goes in unchanged, as game memory stays
+// big-endian on every system the port runs on.
+function readCardSave(saveDir) {
+  const file = path.join(saveDir, `${NAME}.dat`);
+  const found = fs.statSync(file, { throwIfNoEntry: false });
+  if (!found) throw new Error(`There is no ${TITLE} save to export yet.`);
+  const data = fs.readFileSync(file);
+  if (data.length !== SIZE) throw new Error(`This save is damaged: it isn't the size the game writes. ${RESTORE}`);
+  return { gci: Buffer.concat([gciHeader(found.mtime), data]), title: TITLE, ...newestSave(data, RESTORE) };
+}
+
+// A dialog only asks before replacing the name it was given, so never replace a file under a name it wasn't given.
+function writeGci(gci, chosen) {
+  const named = /\.gci$/i.test(chosen);
+  const file = named ? chosen : `${chosen}.gci`;
+  if (!named && fs.existsSync(file)) throw new Error(`${path.basename(file)} already exists. Choose another name.`);
+  // Written beside it and renamed, so a full disk can't cost the player a .gci they are replacing.
+  const temporary = path.join(path.dirname(file), `.${path.basename(file)}.export-${process.pid}`);
+  try {
+    fs.writeFileSync(temporary, gci);
+    fs.renameSync(temporary, file);
+  } finally { fs.rmSync(temporary, { force: true }); }
+  return file;
+}
+
+module.exports = { EXPORT_NAME, convertGci, readGci, readGciFiles, importGci, newestPlain, readCardSave, writeGci };

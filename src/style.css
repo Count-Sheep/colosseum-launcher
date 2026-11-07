@@ -383,9 +383,11 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .dolphin-save-drop { padding: 16px; border: 2px dashed #c79bbd; border-radius: 14px; background: #fbf4f9; }
 .dolphin-save-drop.drag-over { border-color: #8a0f6f; background: #f6e3f1; }
 .dolphin-save-drop[aria-disabled="true"] { opacity: .55; }
-.dolphin-save-drop .helper { display: block; margin: 4px 0 10px; }
-#dolphin-import-result:not(:empty) { display: block; margin-top: 10px; }
+.dolphin-save-drop .helper, .save-export .helper { display: block; margin: 4px 0 10px; }
+:is(#dolphin-import-result, #gci-export-result):not(:empty) { display: block; margin-top: 10px; }
+.save-export { padding: 16px; border: 2px solid #eadde6; border-radius: 14px; background: #fbf4f9; }
 .dark .dolphin-save-drop { border-color: #77395d; background: #3e152a; }
+.dark .save-export { border-color: #5a2a44; background: #3e152a; }
 .dark .dolphin-save-drop.drag-over { border-color: #d283c8; background: #4b1d35; }
 .dark :is(.backup-progress-none, .backup-progress-empty) { color: #b295a9; }
 .settings-group > .small-path { min-height: 0; margin: 0; padding: 14px 0 2px; }
