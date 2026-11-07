@@ -1339,6 +1339,16 @@ function registerHandlers() {
     log(`Imported Dolphin ${converted.title} save into ${directory}.${result.previous ? ` Previous saves: ${result.previous}` : ''}`);
     return { ...result, trainer: converted.trainer, party: converted.party, file: path.basename(file), skipped };
   }));
+  ipcMain.handle('export-gci-save', () => exclusive('Export save', async () => {
+    const save = gciSave.readCardSave(currentSaveDirectory());
+    const chosen = await dialog.showSaveDialog(window, { title: 'Export save',
+      defaultPath: path.join(app.getPath('downloads'), gciSave.EXPORT_NAME),
+      filters: [{ name: 'Dolphin save', extensions: ['gci'] }] });
+    if (chosen.canceled || !chosen.filePath) return { cancelled: true };
+    const file = gciSave.writeGci(save.gci, chosen.filePath);
+    log(`Exported ${save.title} save to ${file}.`);
+    return { file: path.basename(file), trainer: save.trainer, damaged: save.damaged, randomized: Boolean(saveRun(currentSaveDirectory()).run) };
+  }));
   ipcMain.handle('restore-saves', async (_event, id) => {
     if (operation || active) throw new Error('Stop the running game or task before restoring saves.');
     if (!saves.listBackups().some(item => item.id === id && item.source === currentSaveDirectory()))

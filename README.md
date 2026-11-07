@@ -118,6 +118,8 @@ The **Saves** tab backs up saves, opens the backup folder and restores a backup,
 
 To carry on from a save you played in Dolphin, export it as a `.gci` file (North American version), then drop it on **Import a Dolphin save** in the **Saves** tab. Your current saves are backed up first, and the `.gci` file is left as it is.
 
+To carry on in Dolphin, choose **Export .gci file** in the **Saves** tab, then import the file in Dolphin's Memory Card Manager, or put it in Dolphin's GCI folder. Your save here isn't changed. A randomizer run keeps its team, but Dolphin plays the rest as the normal game, as only the port has the randomizer.
+
 ### Pokédex
 
 The **Pokédex** tab shows every Pokémon on your disc, read from the disc itself: its 3D model, which you can turn and zoom, its motions, and any other looks it has, such as a shiny one. Each Pokémon says how you can get it. Those the game keeps out of reach carry a lock: **Battle only** for those trainers use but you can't catch, and **Hidden on disc** for those that are on the disc but never appear in the game.

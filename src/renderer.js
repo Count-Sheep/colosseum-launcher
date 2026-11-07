@@ -601,6 +601,7 @@ function refresh(data) {
   $('backup-saves').disabled = Boolean(data.active);
   $('restore-saves').disabled = Boolean(data.active) || !data.backups.length;
   $('import-dolphin-save').disabled = Boolean(data.active);
+  $('export-gci-save').disabled = Boolean(data.active);
   $('dolphin-save-drop').setAttribute('aria-disabled', String(Boolean(data.active)));
   const selectedBackup = $('backup-list').value;
   $('backup-list').replaceChildren(...data.backups.map(backup => {
@@ -1357,6 +1358,20 @@ async function importDolphinSave(files) {
   await sync();
 }
 $('import-dolphin-save').addEventListener('click', () => importDolphinSave());
+$('export-gci-save').addEventListener('click', async () => {
+  const resultText = $('gci-export-result');
+  resultText.textContent = '';
+  try {
+    const result = await window.colo.exportGciSave();
+    if (result.cancelled) resultText.textContent = 'Export cancelled.';
+    else {
+      const warning = result.damaged ? ' Its newest progress could not be read, so the game will load the copy before it.' : '';
+      const randomized = result.randomized ? ' This is a randomizer run: your team comes with it, but Dolphin plays the rest as the normal game.' : '';
+      resultText.textContent = `Exported ${result.trainer}'s save to ${result.file}.${warning}${randomized}`;
+    }
+  } catch (error) { resultText.textContent = errorText(error); }
+  await sync();
+});
 const dolphinDrop = $('dolphin-save-drop');
 for (const type of ['dragenter', 'dragover']) dolphinDrop.addEventListener(type, event => {
   event.preventDefault();
