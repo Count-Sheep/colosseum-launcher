@@ -144,6 +144,21 @@
               <label class="field"><span>Text<small>HD draws the game's fonts sharp from the Inter typeface. Upscaled keeps their original look, enlarged.</small></span><select id="hdText"><option value="on">HD</option><option value="upscaled">Upscaled</option><option value="off">As on the disc</option></select></label>
             </div>
             <p class="preset-tip"><strong>Fast-forward:</strong> hold <strong>L + R</strong> (Q + E on the keyboard) to run the game at 4× and skip movies. <strong>A</strong> skips a movie.</p>
+                      <h2 class="group-title">Randomizer</h2>
+            <div class="settings-group">
+              <label class="switch"><span><strong>Randomize new games</strong><small>Swaps the game's Pokémon for others, chosen by a seed. It starts with your next New Game and stays with that save: an existing save is never changed.</small></span><input id="randomizer" type="checkbox"><i></i></label>
+              <div id="randomizer-options" class="randomizer-options" hidden>
+                <div class="field randomizer-seed"><span>Seed<small>The same seed and choices make the same run, so you can share them. Fights stay the same when you lose and try again.</small></span><input id="randomizerSeed" type="text" maxlength="8" spellcheck="false" aria-label="Randomizer seed"><button id="randomizer-reroll" class="subtle" type="button">New seed</button></div>
+                <label class="switch"><span><strong>Starters</strong><small>Your first two Pokémon, instead of Espeon and Umbreon.</small></span><input id="randomizerStarters" type="checkbox"><i></i></label>
+                <label class="switch"><span><strong>Shadow Pokémon</strong><small>Every Shadow Pokémon you can snag. Each is a different species.</small></span><input id="randomizerShadow" type="checkbox"><i></i></label>
+                <label class="switch"><span><strong>Trainers' Pokémon</strong><small>Everything else trainers send out.</small></span><input id="randomizerTrainers" type="checkbox"><i></i></label>
+                <label class="switch"><span><strong>Gifts</strong><small>The Pokémon Duking and Mt. Battle give you.</small></span><input id="randomizerGifts" type="checkbox"><i></i></label>
+                <div class="field randomizer-generations"><span>Generations<small>Choose at least one.</small></span><span class="randomizer-checks"><label><input id="randomizerGen1" type="checkbox">Gen 1</label><label><input id="randomizerGen2" type="checkbox">Gen 2</label><label><input id="randomizerGen3" type="checkbox">Gen 3</label></span></div>
+                <label class="switch"><span><strong>Similar strength</strong><small>Picks Pokémon about as strong as the ones they replace, so early trainers stay beatable.</small></span><input id="randomizerSimilar" type="checkbox"><i></i></label>
+                <label class="switch"><span><strong>No legendaries</strong><small>Leaves legendary and mythical Pokémon out.</small></span><input id="randomizerNoLegendaries" type="checkbox"><i></i></label>
+              </div>
+              <div class="field randomizer-save"><span>Your save<small id="randomizer-save-note"></small></span><button id="randomizer-spoilers" class="subtle" type="button" hidden>Show spoilers</button></div>
+            </div>
           </section>
 
           <section id="pane-display" class="settings-pane" role="tabpanel" aria-labelledby="tab-display" hidden>

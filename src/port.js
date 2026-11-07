@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const bindings = require('./bindings');
 const presets = require('./presets');
+const randomizer = require('./randomizer');
 const { normalizeChannel } = require('./update-channel');
 const { prependWindowsPath } = require('./windows-path');
 const { describe } = require('./disc');
@@ -149,7 +150,9 @@ function normalizeSettings(input = {}, platform = process.platform, arch = gameA
     // How far an analog trigger goes before it counts as L or R pressed, in percent.
     triggerClick: numberSetting(input.triggerClick, 85, 10, 100),
     // Controller rumble in percent: 0 turns it off.
-    rumbleStrength: numberSetting(input.rumbleStrength, 100, 0, 100)
+    rumbleStrength: numberSetting(input.rumbleStrength, 100, 0, 100),
+    // What a new save randomizes (randomizer.js): a save keeps the seed it starts with.
+    ...randomizer.normalize(input)
   };
   // The graphics preset chosen (src/presets.js), while the picture settings still match it; else Custom.
   settings.graphicsPreset = presets.reconcile({ ...settings, graphicsPreset: input.graphicsPreset });
@@ -245,6 +248,8 @@ function buildEnvironment(settings, disc, root, { customTextures = null } = {}) 
     SMS_GX_SHADER_WARMUP: settings.shaderWarmup === false ? '0' : '1'
   };
   if (settings.skipMovies) env.COLO_SKIP_MOVIES = '1';
+  const run = randomizer.environmentValue(settings);
+  if (run) env.COLO_RANDOMIZER = run;
   if (settings.hdModels === false) env.COLO_HD_MODELS = '0';
   if (settings.battleSpeed !== 'normal') env.COLO_BATTLE_SPEED = settings.battleSpeed;
   // Unset is the default; any other value would name a glyph file.

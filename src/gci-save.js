@@ -77,7 +77,7 @@ function summary(plain, count) {
 }
 
 // The slot the game will load: the newest whose hash holds, as it falls back from a damaged one.
-function newestSave(data) {
+function newestPlain(data) {
   const slots = [];
   for (let i = 0; i < SLOTS; i++) {
     const start = SLOT_START + i * SLOT_SIZE;
@@ -91,9 +91,14 @@ function newestSave(data) {
     throw otherFile(`This ${TITLE} save has no saved progress.`, `${TITLE} save with no saved progress`, 'NO_PROGRESS');
   for (const [damaged, { slot, count }] of written.entries()) {
     const plain = unscramble(slot);
-    if (plain) return { ...summary(plain, count), damaged };
+    if (plain) return { plain, count, damaged };
   }
   throw new Error('This save is damaged: none of its three copies can be read. Export the save again from Dolphin.');
+}
+
+function newestSave(data) {
+  const { plain, count, damaged } = newestPlain(data);
+  return { ...summary(plain, count), damaged };
 }
 
 // GCI is a big-endian GameCube directory entry followed by the unchanged card file data. The port keeps that data as
@@ -208,4 +213,4 @@ function importGci(converted, saveDir, backups = saves.backupRoot()) {
   return { name: converted.name, directory: saveDir, previous: previous.directory || null };
 }
 
-module.exports = { convertGci, readGci, readGciFiles, importGci };
+module.exports = { convertGci, readGci, readGciFiles, importGci, newestPlain };

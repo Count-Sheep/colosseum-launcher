@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld('colo', {
   showPathFolder: () => ipcRenderer.invoke('show-path-folder'),
   openCustomTextures: () => ipcRenderer.invoke('open-custom-textures'),
   stop: () => ipcRenderer.invoke('stop'),
+  randomizerNewSeed: () => ipcRenderer.invoke('randomizer-new-seed'),
+  randomizerSpoilers: () => ipcRenderer.invoke('randomizer-spoilers'),
   pokedex: () => ipcRenderer.invoke('pokedex'),
   pokedexModel: (national, form) => ipcRenderer.invoke('pokedex-model', national, form),
   pokedexClip: (national, form, index) => ipcRenderer.invoke('pokedex-clip', national, form, index),

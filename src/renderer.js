@@ -646,14 +646,16 @@ function refresh(data) {
   if (!capture) renderBindings();
   $('reset-bindings').disabled = Boolean(data.active);
   for (const key of [...SELECTS, ...SWITCHES, 'graphicsPreset']) $(key).disabled = Boolean(data.active);
+  renderRandomizer(data);
   renderDependents(Boolean(data.active));
   changing = false;
 }
 
 // The settings that are a list or a range, and the ones that are a switch: each saves under its element's id.
 const SELECTS = ['widescreen', 'resolution', 'frameRate', 'vsync', 'fullscreenMode', 'exclusiveResolution', 'display', 'msaa', 'anisotropic',
-  'sharpen', 'brightness', 'aspect', 'presentFilter', 'fsrMode', 'textureLoading', 'renderer', 'hdText', 'battleSpeed', 'padMode', 'updateChannel'];
-const SWITCHES = ['fullscreen', 'hudEdges', 'skipMovies', 'overlay', 'backgroundInput', 'fxaa', 'textures', 'hdModels', 'shaderWarmup', 'autoUpdate', 'autoBackups', 'darkMode'];
+  'sharpen', 'brightness', 'aspect', 'presentFilter', 'fsrMode', 'textureLoading', 'renderer', 'hdText', 'battleSpeed', 'padMode', 'updateChannel', 'randomizerSeed'];
+const SWITCHES = ['randomizer', 'randomizerStarters', 'randomizerShadow', 'randomizerTrainers', 'randomizerGifts', 'randomizerGen1', 'randomizerGen2', 'randomizerGen3',
+  'randomizerSimilar', 'randomizerNoLegendaries', 'fullscreen', 'hudEdges', 'skipMovies', 'overlay', 'backgroundInput', 'fxaa', 'textures', 'hdModels', 'shaderWarmup', 'autoUpdate', 'autoBackups', 'darkMode'];
 
 let updateChannels = [{ id: 'stable', label: 'Stable' }];
 function renderUpdateChannels(chosen) {
@@ -901,6 +903,19 @@ function settingsValue() {
   for (const key of SELECTS) value[key] = $(key).value;
   for (const key of SWITCHES) value[key] = $(key).checked;
   return value;
+}
+
+// What the randomizer will do, and what the save on the card already is: the save wins.
+function renderRandomizer(data) {
+  const { run, exists } = data.randomizerSave || {}, ready = data.randomizerReady !== false;
+  $('randomizer-options').hidden = !data.config.settings.randomizer;
+  $('randomizer-spoilers').hidden = !run;
+  $('randomizer-spoilers').disabled = Boolean(data.active);
+  $('randomizer-reroll').disabled = Boolean(data.active);
+  $('randomizer-save-note').textContent = !ready ? 'Update your game to use the randomizer. This version of the game plays every save as normal.'
+    : run ? `A randomized run, seed ${run.seed}. It keeps this seed whatever is set here; a New Game uses the settings above.`
+      : exists ? 'The normal game. It stays that way: settings here start with your next New Game.'
+        : 'No save yet. A New Game uses the settings above.';
 }
 
 async function saveSettings() {
@@ -1359,6 +1374,13 @@ dolphinDrop.addEventListener('drop', event => {
 for (const type of ['dragover', 'drop']) window.addEventListener(type, event => event.preventDefault());
 $('open-custom-textures').addEventListener('click', () => window.colo.openCustomTextures().catch(showError));
 for (const key of [...SELECTS, ...SWITCHES]) $(key).addEventListener('change', saveSettings);
+$('randomizer-reroll').addEventListener('click', async () => {
+  try {
+    $('randomizerSeed').value = await window.colo.randomizerNewSeed();
+    await saveSettings();
+  } catch (error) { showError(error); }
+});
+$('randomizer-spoilers').addEventListener('click', () => window.colo.randomizerSpoilers().catch(showError));
 for (const key of ['sharpen', 'brightness']) $(key).addEventListener('input', renderRanges);
 for (const key of ['fullscreen', 'fullscreenMode', 'widescreen', 'presentFilter', 'textures', 'textureLoading'])
   $(key).addEventListener('input', () => renderDependents());

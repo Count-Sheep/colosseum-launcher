@@ -667,3 +667,13 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .pokedex-stats i::after { display: block; width: var(--stat); height: 100%; border-radius: inherit; background: var(--dex-accent); content: ''; }
 .pokedex-evolution { margin: 0 4px 2px 0; padding: 1px 7px; border: 1px solid var(--dex-line); border-radius: 6px; background: transparent; color: inherit; font-size: 12px; font-weight: 600; }
 .pokedex-evolution:hover { background: var(--dex-hover); }
+
+/* Randomizer */
+.randomizer-options { display: contents; }
+.randomizer-options[hidden] { display: none !important; }
+.randomizer-seed input { flex: none; width: 112px; padding: 7px 10px; border: 1px solid #dcd4dd; border-radius: 7px; background: #fff; color: #3e2436; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: .04em; text-transform: uppercase; }
+.dark .randomizer-seed input { border-color: #673651; background: #341123; color: #f1e4ed; }
+.randomizer-checks { flex: none !important; display: flex !important; gap: 14px; }
+.randomizer-checks label { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; }
+.randomizer-checks input { accent-color: #841d74; }
+.dark .randomizer-checks input { accent-color: #ffc75a; }
