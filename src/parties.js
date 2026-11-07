@@ -37,7 +37,10 @@ function normalize(input) {
     while (parties.some(other => other.id === clean.id)) clean.id = `${clean.id}-2`.slice(-40);
     parties.push(clean);
   }
-  const selected = parties.some(party => party.id === input?.selected) ? input.selected : null;
+  // Always a party ready to battle with: having one is enough to open a room.
+  const ready = party => party.members.length === PARTY_SIZE;
+  const chosen = parties.find(party => party.id === input?.selected);
+  const selected = (chosen && ready(chosen) ? chosen : parties.find(ready))?.id ?? null;
   return { trainer: trainerName(input?.trainer), parties, selected,
     level: LEVELS.includes(input?.level) ? input.level : LEVELS[0],
     size: SIZES.includes(input?.size) ? input.size : SIZES[1],
