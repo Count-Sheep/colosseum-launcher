@@ -159,6 +159,18 @@ test('Update & play shows the newly built game version once the game starts', as
   assert.equal(ui.elements.get('installed-game-version').textContent, 'newer');
 });
 
+test('skipping battle animations, or a running task, greys out their speed', async () => {
+  const skipping = state();
+  skipping.config.settings.skipBattleAnimations = true;
+  assert.equal((await renderer(skipping)).elements.get('battleSpeed').disabled, true);
+  const ui = await renderer();
+  assert.equal(ui.elements.get('battleSpeed').disabled, false);
+  assert.equal(ui.elements.get('battleSpeed-value').textContent, '1.5×');
+  const busy = state();
+  busy.active = { label: 'Building' };
+  assert.equal((await renderer(busy)).elements.get('battleSpeed').disabled, true);
+});
+
 test('installed play is unavailable before setup, without a disc, or while busy', async () => {
   for (const patch of [{ binaryReady: false, config: { ...state().config, completedSetup: false } }, { romReady: false }]) {
     const ui = await renderer({ ...state(), ...patch });

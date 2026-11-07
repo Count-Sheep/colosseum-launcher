@@ -122,17 +122,24 @@ test('settings reach the variables the game reads', () => {
   assert.equal(env.SMS_GAMMA, '1.50');
 });
 
-test('battle speed is 2x unless changed, and Normal leaves it to the game', () => {
-  const env = battleSpeed => port.buildEnvironment(port.normalizeSettings({ battleSpeed }), 'disc', '/port').COLO_BATTLE_SPEED;
+test('battle speed is 1.5x unless changed, in tenths from 1x to 5x, and 1x leaves it to the game', () => {
+  const env = (battleSpeed, skipBattleAnimations) =>
+    port.buildEnvironment(port.normalizeSettings({ battleSpeed, skipBattleAnimations }), 'disc', '/port').COLO_BATTLE_SPEED;
   const saved = process.env.COLO_BATTLE_SPEED;
   delete process.env.COLO_BATTLE_SPEED;
   try {
-    assert.equal(env(undefined), '2');
-    assert.equal(env('normal'), undefined);
-    assert.equal(env('fast'), '2');
-    assert.equal(env('2'), '2');
-    assert.equal(env('4'), '4');
-    assert.equal(env('skip'), 'skip');
+    assert.equal(env(undefined), '1.5');
+    assert.equal(env('fast'), '1.5');
+    assert.equal(env(''), '1.5');
+    assert.equal(env('1'), undefined);
+    assert.equal(env('1.1'), '1.1');
+    assert.equal(env('2.7'), '2.7');
+    assert.equal(env(3.3000000000000003), '3.3');
+    assert.equal(env('5'), '5');
+    assert.equal(env('0.2'), undefined);
+    assert.equal(env('9'), '5');
+    assert.equal(env('2.7', true), 'skip');
+    assert.equal(env('1', true), 'skip');
   } finally { if (saved !== undefined) process.env.COLO_BATTLE_SPEED = saved; }
 });
 
@@ -148,8 +155,20 @@ test('HD models are on unless turned off, and on leaves it to the game', () => {
   } finally { if (saved !== undefined) process.env.COLO_HD_MODELS = saved; }
 });
 
-test('a saved 8x battle speed, which Beta launchers offered, becomes 4x', () => {
-  assert.equal(port.normalizeSettings({ battleSpeed: '8' }).battleSpeed, '4');
+test('battle speeds saved before the slider keep their speed, and Skip becomes the switch', () => {
+  const saved = battleSpeed => {
+    const { battleSpeed: speed, skipBattleAnimations: skip } = port.normalizeSettings({ battleSpeed });
+    return [speed, skip];
+  };
+  assert.deepEqual(saved('normal'), [1, false]);
+  assert.deepEqual(saved('2'), [2, false]);
+  assert.deepEqual(saved('4'), [4, false]);
+  assert.deepEqual(saved('8'), [5, false]);
+  assert.deepEqual(saved('skip'), [1.5, true]);
+  // Read again after saving, so Skip does not undo itself.
+  const once = port.normalizeSettings({ battleSpeed: 'skip' });
+  assert.deepEqual(port.normalizeSettings(once).skipBattleAnimations, true);
+  assert.equal(port.normalizeSettings({ ...once, skipBattleAnimations: false }).skipBattleAnimations, false);
 });
 
 test('HD text stays unset by default: any other value names a glyph file', () => {
