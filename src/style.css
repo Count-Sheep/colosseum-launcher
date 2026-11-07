@@ -695,7 +695,7 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .online-input:focus-visible { outline: 2px solid var(--dex-accent); outline-offset: 1px; }
 .party-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding: 1px; }
 .party-card { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; padding: 9px 10px; border: 1px solid var(--dex-line); border-radius: 10px; background: var(--dex-panel); color: inherit; text-align: left; font-weight: 500; }
-.party-card:hover { border-color: var(--dex-accent); }
+.party-card:not([aria-disabled=true]):hover { border-color: var(--dex-accent); }
 .party-card[aria-checked=true] { border-color: var(--dex-accent); box-shadow: inset 3px 0 0 var(--dex-accent); }
 .party-card strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .party-card-edit { padding: 2px 8px; border: 1px solid var(--dex-line); border-radius: 6px; background: transparent; color: inherit; font-size: 11px; font-weight: 600; }

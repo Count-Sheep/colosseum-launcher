@@ -263,7 +263,11 @@ async function exclusive(label, callback, newLog = false) {
     }
     throw error;
   }
-  finally { operation = null; broadcast('activity', null); }
+  finally {
+    operation = null;
+    broadcast('activity', null);
+    if (config) broadcastOnline(); // a task can install or update the game, which rooms depend on
+  }
 }
 
 // Whether a command said so, for the GameCube adapter's checks: its output, or '' when it could not run.
@@ -1077,7 +1081,7 @@ function gameHasOnline(root) {
 function onlineReadiness() {
   if (!port.isPort(config.repo) || !binaryReady()) return 'Set up the game on the Play page first.';
   if (!gameHasOnline(config.repo)) return 'This version of the game has no online battles yet. Update it from the Play page.';
-  if (!parties.selectedParty(config.online)) return 'Choose a party of six to battle with.';
+  if (!parties.selectedParty(config.online)) return 'Build a party of six to battle with.';
   return null;
 }
 
@@ -1481,6 +1485,7 @@ function registerHandlers() {
     config.previousInstall = null;
     config.completedSetup = fs.existsSync(port.binaryPath(config.repo));
     saveConfig();
+    broadcastOnline();
     return state();
   });
   ipcMain.handle('choose-location', async () => {
@@ -1496,6 +1501,7 @@ function registerHandlers() {
     config.previousInstall = null;
     config.completedSetup = fs.existsSync(port.binaryPath(config.repo));
     saveConfig();
+    broadcastOnline();
     return state();
   });
   const actions = { 'install-port': ['Download port source', installPort],

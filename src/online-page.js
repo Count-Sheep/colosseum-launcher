@@ -45,11 +45,13 @@
   function renderParties() {
     $('party-empty').hidden = setup.parties.length > 0;
     $('party-list').replaceChildren(...setup.parties.map(party => {
+      const missing = PARTY_SIZE - party.members.length;
       const card = document.createElement('div');
       card.className = 'party-card';
       card.setAttribute('role', 'radio');
       card.setAttribute('aria-checked', String(party.id === setup.selected));
-      card.tabIndex = 0;
+      card.setAttribute('aria-disabled', String(missing > 0));
+      card.tabIndex = missing ? -1 : 0;
       const name = Object.assign(document.createElement('strong'), { textContent: party.name });
       const edit = Object.assign(document.createElement('button'), { className: 'party-card-edit', type: 'button', textContent: 'Edit' });
       edit.addEventListener('click', event => { event.stopPropagation(); openEditor(party); });
@@ -57,8 +59,10 @@
       team.append(...party.members.map(id => sprite(id, 36)));
       for (let i = party.members.length; i < PARTY_SIZE; i++) team.append(Object.assign(document.createElement('span'), { textContent: '–' }));
       card.append(name, edit, team);
-      if (party.members.length < PARTY_SIZE)
-        card.append(Object.assign(document.createElement('small'), { textContent: `${PARTY_SIZE - party.members.length} more to battle with this party` }));
+      if (missing) {
+        card.append(Object.assign(document.createElement('small'), { textContent: `${missing} more to battle with this party` }));
+        return card;
+      }
       const choose = () => { setup.selected = party.id; save(); };
       card.addEventListener('click', choose);
       card.addEventListener('keydown', event => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); choose(); } });
@@ -123,14 +127,12 @@
     const at = setup.parties.findIndex(item => item.id === party.id);
     if (at >= 0) setup.parties[at] = party;
     else setup.parties.push(party);
-    if (!setup.selected && party.members.length === PARTY_SIZE) setup.selected = party.id;
     $('party-editor').close();
     save();
   }
 
   function deleteParty() {
     setup.parties = setup.parties.filter(item => item.id !== editing.id);
-    if (setup.selected === editing.id) setup.selected = null;
     $('party-editor').close();
     save();
   }

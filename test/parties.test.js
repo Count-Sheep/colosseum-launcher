@@ -27,11 +27,15 @@ test('party ids stay apart and names are never empty', () => {
   assert.equal(list[0].name, 'Party 1');
 });
 
-test('only a full party can be battled with', () => {
-  const full = { id: 'full', name: 'A', members: [1, 2, 3, 4, 5, 6] }, short = { id: 'short', name: 'B', members: [1] };
-  assert.equal(parties.selectedParty(parties.normalize({ parties: [full, short], selected: 'full' })).id, 'full');
-  assert.equal(parties.selectedParty(parties.normalize({ parties: [full, short], selected: 'short' })), null);
-  assert.equal(parties.normalize({ parties: [full], selected: 'gone' }).selected, null);
+test('only a full party can be battled with, and a full party is always chosen', () => {
+  const full = { id: 'full', name: 'A', members: [1, 2, 3, 4, 5, 6] }, other = { ...full, id: 'other' }, short = { id: 'short', name: 'B', members: [1] };
+  assert.equal(parties.selectedParty(parties.normalize({ parties: [full, other], selected: 'other' })).id, 'other');
+  assert.equal(parties.normalize({ parties: [short, full], selected: 'short' }).selected, 'full');
+  assert.equal(parties.normalize({ parties: [short, full] }).selected, 'full');
+  assert.equal(parties.normalize({ parties: [full], selected: 'gone' }).selected, 'full');
+  const none = parties.normalize({ parties: [short], selected: 'short' });
+  assert.equal(none.selected, null);
+  assert.equal(parties.selectedParty(none), null);
 });
 
 test('rules come from what rooms offer', () => {
