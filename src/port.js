@@ -92,6 +92,13 @@ function numberSetting(value, fallback, lo, hi) {
 }
 function choiceSetting(value, choices, fallback) { return choices.includes(value) ? value : fallback; }
 
+// How many times faster a battle's animations play, to a tenth. Launchers before the slider saved
+// 'normal', '2', '4' or 'skip' (Beta also '8'): each keeps its speed, or the fastest left.
+function battleSpeedSetting(value) {
+  const speed = value === 'normal' ? 1 : value === null || value === '' ? NaN : Number(value);
+  return Number.isFinite(speed) ? Math.min(5, Math.max(1, Math.round(speed * 10) / 10)) : 1.5;
+}
+
 function normalizeSettings(input = {}, platform = process.platform, arch = gameArch()) {
   const info = platformInfo(platform, arch);
   const settings = {
@@ -110,9 +117,9 @@ function normalizeSettings(input = {}, platform = process.platform, arch = gameA
       : choiceSetting(input.display, ['launcher', 'primary'], 'launcher'),
     vsync: choiceSetting(input.vsync, ['off', 'on', 'adaptive'], 'off'),
     skipMovies: Boolean(input.skipMovies),
-    // How a battle's animations play: as on the disc, 2 or 4 times faster, or skipped.
-    // Beta launchers offered 8 times faster: those players keep the fastest speed left.
-    battleSpeed: choiceSetting(input.battleSpeed === '8' ? '4' : input.battleSpeed, ['normal', '2', '4', 'skip'], '2'),
+    // A battle's animations skipped, or else played at battleSpeed: 1 is as on the disc.
+    skipBattleAnimations: input.battleSpeed === 'skip' || Boolean(input.skipBattleAnimations),
+    battleSpeed: battleSpeedSetting(input.battleSpeed),
     // The frame-time overlay at start.
     overlay: Boolean(input.overlay),
     // The fonts drawn sharp from the Inter typeface (on), the game's own upscaled, or as on the disc.
@@ -253,7 +260,8 @@ function buildEnvironment(settings, disc, root, { customTextures = null } = {}) 
   const run = randomizer.environmentValue(settings);
   if (run) env.COLO_RANDOMIZER = run;
   if (settings.hdModels === false) env.COLO_HD_MODELS = '0';
-  if (settings.battleSpeed !== 'normal') env.COLO_BATTLE_SPEED = settings.battleSpeed;
+  if (settings.skipBattleAnimations) env.COLO_BATTLE_SPEED = 'skip';
+  else if (settings.battleSpeed !== 1) env.COLO_BATTLE_SPEED = String(settings.battleSpeed);
   // Unset is the default; any other value would name a glyph file.
   if (settings.hdText !== 'on') env.COLO_HD_TEXT = settings.hdText === 'off' ? '0' : 'upscaled';
   if (/^\d+x\d+$/.test(settings.exclusiveResolution || '')) env.SMS_FULLSCREEN_MODE = settings.exclusiveResolution;

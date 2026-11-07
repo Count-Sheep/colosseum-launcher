@@ -658,7 +658,7 @@ function refresh(data) {
 const SELECTS = ['widescreen', 'resolution', 'frameRate', 'vsync', 'fullscreenMode', 'exclusiveResolution', 'display', 'msaa', 'anisotropic',
   'sharpen', 'brightness', 'aspect', 'presentFilter', 'fsrMode', 'textureLoading', 'renderer', 'hdText', 'battleSpeed', 'padMode', 'updateChannel', 'randomizerSeed'];
 const SWITCHES = ['randomizer', 'randomizerStarters', 'randomizerShadow', 'randomizerTrainers', 'randomizerGifts', 'randomizerGen1', 'randomizerGen2', 'randomizerGen3',
-  'randomizerSimilar', 'randomizerNoLegendaries', 'fullscreen', 'hudEdges', 'skipMovies', 'overlay', 'backgroundInput', 'fxaa', 'textures', 'hdModels', 'shaderWarmup', 'autoUpdate', 'autoBackups', 'shareUsage', 'darkMode'];
+  'randomizerSimilar', 'randomizerNoLegendaries', 'fullscreen', 'hudEdges', 'skipMovies', 'skipBattleAnimations', 'overlay', 'backgroundInput', 'fxaa', 'textures', 'hdModels', 'shaderWarmup', 'autoUpdate', 'autoBackups', 'shareUsage', 'darkMode'];
 
 let updateChannels = [{ id: 'stable', label: 'Stable' }];
 function renderUpdateChannels(chosen) {
@@ -857,6 +857,7 @@ $('darkMode').addEventListener('input', renderTheme);
 function renderRanges() {
   $('brightness-value').textContent = `${$('brightness').value}%`;
   $('sharpen-value').textContent = Number($('sharpen').value) ? `${$('sharpen').value}%` : 'Off';
+  $('battleSpeed-value').textContent = `${Number($('battleSpeed').value).toFixed(1)}×`;
 }
 
 // Same as the launcher and Primary, and a monitor chosen in the game's own settings menu (monitor2, ...).
@@ -882,6 +883,7 @@ function renderExclusiveResolutions(chosen) {
 
 // Choices that only matter with another one on are dimmed until then.
 function renderDependents(busy = false) {
+  $('battleSpeed').disabled = busy || $('skipBattleAnimations').checked;
   $('fullscreenMode').disabled = busy || !$('fullscreen').checked;
   $('exclusiveResolution').disabled = busy || !$('fullscreen').checked || $('fullscreenMode').value !== 'exclusive';
   // the game keeps its battle panels in the middle in 4:3
@@ -1398,8 +1400,8 @@ $('randomizer-reroll').addEventListener('click', async () => {
   } catch (error) { showError(error); }
 });
 $('randomizer-spoilers').addEventListener('click', () => window.colo.randomizerSpoilers().catch(showError));
-for (const key of ['sharpen', 'brightness']) $(key).addEventListener('input', renderRanges);
-for (const key of ['fullscreen', 'fullscreenMode', 'widescreen', 'presentFilter', 'textures', 'textureLoading'])
+for (const key of ['sharpen', 'brightness', 'battleSpeed']) $(key).addEventListener('input', renderRanges);
+for (const key of ['skipBattleAnimations', 'fullscreen', 'fullscreenMode', 'widescreen', 'presentFilter', 'textures', 'textureLoading'])
   $(key).addEventListener('input', () => renderDependents());
 window.colo.onLog(appendLog);
 window.colo.onLogReset(resetLog);
