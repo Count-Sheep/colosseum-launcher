@@ -26,6 +26,7 @@ const displayScale = require('./display-scale');
 const steam = require('./steam');
 const crashReports = require('./crash-reports');
 const pokedexData = require('./pokedex').create();
+const randomizer = require('./randomizer');
 const { retrying, httpError } = require('./retry');
 
 const GAME_NAME = 'Pokémon Colosseum';
@@ -34,6 +35,8 @@ const PLAY_LABEL = `Play ${GAME_NAME}`;
 
 let window;
 let config;
+const saveRun = randomizer.createSaveReader();
+const spoilerFile = () => path.join(app.getPath('userData'), randomizer.SPOILER_FILE);
 let active = null;
 let preparingTools = false;
 let operation = null;
@@ -908,6 +911,7 @@ async function play(installation = null) {
   const playEnv = { ...port.buildEnvironment(settings, rom, root, { customTextures: customTextureDirectory() }),
     ...saves.gameDataEnvironment(), ...bindingsEnvironment(settings),
     // The renderer's caches, in the launcher's own folder: its default place is shared with the Sunshine port's.
+    COLO_RANDOMIZER_LOG: spoilerFile(),
     SMS_GX_SHADER_CACHE: path.join(cacheFolder, 'gx-programs.bin'), SMS_TEXTURE_PACK_CACHE: path.join(cacheFolder, 'texture-mips') };
   const recordedTools = game.toolRoot(root);
   const env = recordedTools ? buildTools.environmentAtRoot(recordedTools, playEnv) : toolEnv(playEnv);
@@ -1035,7 +1039,9 @@ function state() {
     active: activityState(), appUpdate, logs: activityLog.snapshot(), logResetSequence: activityLog.resetSequence(),
     saveDirectory: currentSaveDirectory(), backupDirectory: saves.backupRoot(),
     backups: saves.listBackups().filter(item => item.source === currentSaveDirectory()),
-    crashReports: crashReports.summary(crashReports.directory()), directPlayFailure
+    crashReports: crashReports.summary(crashReports.directory()), directPlayFailure,
+    // The run on the memory card, and whether the game on disk can play one.
+    randomizerSave: saveRun(currentSaveDirectory()), randomizerReady: repoReady && fs.existsSync(path.join(config.repo, 'host', 'randomizer.c'))
   };
 }
 
@@ -1217,6 +1223,17 @@ function registerHandlers() {
   });
   ipcMain.handle('window-close', event => senderWindow(event)?.close());
   ipcMain.handle('state', async () => { await checkTools(); return state(); });
+  ipcMain.handle('randomizer-new-seed', () => randomizer.newSeed());
+  ipcMain.handle('randomizer-spoilers', async () => {
+    const { run } = saveRun(currentSaveDirectory());
+    if (!run) throw new Error('Your save isn\'t a randomized run, so there are no spoilers to show.');
+    let raw = null;
+    try { raw = fs.readFileSync(spoilerFile(), 'utf8'); } catch (_) { /* written when the game opens the run */ }
+    if (randomizer.spoilerSeed(raw) !== run.seed) throw new Error('Open your save in the game once first: the spoiler log is written when it loads.');
+    const readable = path.join(app.getPath('userData'), 'Randomizer spoilers.txt');
+    fs.writeFileSync(readable, randomizer.spoilerText(raw, pokedexData.list(port.validateRom(config.rom))));
+    await shell.openPath(readable);
+  });
   ipcMain.handle('pokedex', () => pokedexData.list(port.validateRom(config.rom)));
   ipcMain.handle('pokedex-model', (_event, national, form) => pokedexData.model(port.validateRom(config.rom), Number(national), String(form)));
   ipcMain.handle('pokedex-clip', (_event, national, form, index) => pokedexData.clip(port.validateRom(config.rom), Number(national), String(form), Number(index)));

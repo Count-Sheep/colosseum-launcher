@@ -122,6 +122,12 @@ To carry on from a save you played in Dolphin, export it as a `.gci` file (North
 
 The **Pokédex** tab shows every Pokémon on your disc, read from the disc itself: its 3D model, which you can turn and zoom, its motions, and any other looks it has, such as a shiny one. Each Pokémon says how you can get it. Those the game keeps out of reach carry a lock: **Battle only** for those trainers use but you can't catch, and **Hidden on disc** for those that are on the disc but never appear in the game.
 
+### Randomizer
+
+Under **Settings → Gameplay**, the randomizer swaps the game's Pokémon for others, chosen by a seed: your starters, Shadow Pokémon, trainers' Pokémon and gifts, each on its own switch. You can limit it to the generations you like, keep Pokémon about as strong as the ones they replace, and leave legendaries out.
+
+It starts with your next **New Game**, and the seed is kept inside that save. Fights stay the same when you lose and try again, and the run goes with the save through backups and imports. An existing save is never changed, and a run keeps its seed whatever the settings say later. Share a seed and the same choices to play the same run as a friend.
+
 ### Privacy
 
 The launcher sends nothing about you. It talks to GitHub and the port's GitLab for updates, the setup files and the HD textures. Your disc image never leaves your computer.
