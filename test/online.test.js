@@ -14,6 +14,14 @@ test('room codes read forgivingly and print with a dash', () => {
   assert.equal(online.formatRoomCode('KQ7M2D'), 'KQ7-M2D');
 });
 
+test('a build id fits what the room keeps, and tells builds apart', () => {
+  const commit = 'a'.repeat(40), decomp = 'b'.repeat(40);
+  assert.ok(online.buildId({ commit, decomp }).length <= 64);
+  assert.equal(online.buildId({ commit, decomp }), online.buildId({ commit, decomp }));
+  assert.notEqual(online.buildId({ commit, decomp }), online.buildId({ commit: `c${commit.slice(1)}`, decomp }));
+  assert.notEqual(online.buildId({ commit, decomp }), online.buildId({ commit, decomp: `c${decomp.slice(1)}` }));
+});
+
 test('the game is told what to set up, and who is in the battle', () => {
   assert.equal(online.configLine({ side: 1, rules: { level: 100, size: 3, stage: 2 } }), 'config 1 100 3 2');
   assert.equal(online.configLine({ side: 0, rules: { level: 50, size: 6 }, code: 'KQ7M2D' }), 'config 0 50 6 0 KQ7-M2D');

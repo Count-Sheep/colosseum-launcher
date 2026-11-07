@@ -1083,7 +1083,7 @@ function onlineReadiness() {
 // What identifies this game to another player's: both must play the very same build.
 function gameBuild() {
   const installedBuild = game.installed(config.repo);
-  return { build: `${installedBuild?.commit || ''}:${installedBuild?.decomp || ''}`, version: installedBuild?.gameVersion || '', launcher: app.getVersion() };
+  return { build: online.buildId(installedBuild), version: installedBuild?.gameVersion || '', launcher: app.getVersion() };
 }
 
 function requireOnlineReady() {

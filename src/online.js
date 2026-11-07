@@ -60,6 +60,12 @@ async function lookup(code, { url = serverUrl(), fetch = globalThis.fetch } = {}
   }
 }
 
+// What tells two builds of the game apart. The room keeps 64 characters of it, and the page compares it with the
+// list's, so two whole commit hashes wouldn't do.
+function buildId(build) {
+  return `${String(build?.commit || '').slice(0, 16)}-${String(build?.decomp || '').slice(0, 16)}`;
+}
+
 // A name on one line of the game's protocol: no spaces in it.
 const lineName = name => String(name).replace(/ /g, '_') || 'Trainer';
 
@@ -328,4 +334,4 @@ class Session extends EventEmitter {
   }
 }
 
-module.exports = { PROTOCOL, STAGES, parseRoomCode, formatRoomCode, serverUrl, listRooms, lookup, configLine, startLine, createBridge, Session };
+module.exports = { PROTOCOL, STAGES, parseRoomCode, formatRoomCode, buildId, serverUrl, listRooms, lookup, configLine, startLine, createBridge, Session };
