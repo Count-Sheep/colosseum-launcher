@@ -1638,6 +1638,7 @@ function createWindow() {
 }
 
 if (ownsInstance) app.whenReady().then(async () => {
+  if (process.env.APPIMAGE && startedFromSteam()) steam.endOnSigterm();
   loadConfig();
   registerHandlers();
   if (playOnStart && await playDirectly()) return app.quit();
