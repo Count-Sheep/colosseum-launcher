@@ -20,7 +20,7 @@ function closeModal() {
 
 // --- Pages: the tabs along the top pick one; Play is the home page. Each page can run code as it shows and hides.
 const pages = {
-  play: { section: 'page-home', nav: 'nav-play' }, saves: { section: 'page-saves', nav: 'nav-saves' },
+  play: { section: 'page-home', nav: 'nav-play' }, saves: { section: 'page-saves', nav: 'nav-saves' }, pokedex: { section: 'page-pokedex', nav: 'nav-pokedex' },
   changelog: { section: 'changelog', nav: 'open-changelog' }, settings: { section: 'page-settings', nav: 'settings-cog' }
 };
 const pageOrder = Object.keys(pages);
@@ -48,6 +48,8 @@ function showPage(name) {
   if (consoleExpanded) { consoleExpanded = false; setConsoleOpen(true); }
 }
 for (const [name, item] of Object.entries(pages)) if (!item.sub) $(item.nav).addEventListener('click', () => showPage(name));
+// The Pokédex (pokedex-page.js) keeps nothing on the GPU while it isn't showing.
+onPage('pokedex', { show: () => window.coloPokedex?.show(), hide: () => window.coloPokedex?.hide() });
 
 // Settings is one page with a tab per section; it reopens on the last one shown.
 const settingsTabs = ['gameplay', 'display', 'graphics', 'controls', 'manage', 'launcher'];

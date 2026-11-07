@@ -25,6 +25,7 @@
     <nav class="nav-bar" aria-label="Launcher">
       <button id="nav-play" class="nav-tab active" aria-current="page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z"/></svg><span>Play</span></button>
       <button id="nav-saves" class="nav-tab" title="Saved games"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h10l3 3v11H4z"/><path d="M7 3v4h6V3M7 17v-5h7v5"/></svg><span>Saves</span></button>
+      <button id="nav-pokedex" class="nav-tab" title="Browse every Pokémon on your disc"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h5M12.5 10h5"/><circle cx="10" cy="10" r="2.5"/></svg><span>Pokédex</span></button>
       <span class="nav-spacer" aria-hidden="true"></span>
       <button id="settings-cog" class="nav-tab" aria-label="Settings" title="Settings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.7 2.8h2.6l.4 1.8 1.6.7 1.6-1 1.8 1.8-1 1.6.7 1.6 1.8.4v2.6l-1.8.4-.7 1.6 1 1.6-1.8 1.8-1.6-1-1.6.7-.4 1.8H8.7l-.4-1.8-1.6-.7-1.6 1-1.8-1.8 1-1.6-.7-1.6-1.8-.4V8.7l1.8-.4.7-1.6-1-1.6 1.8-1.8 1.6 1 1.6-.7z"/><circle cx="10" cy="10" r="2.3"/></svg><span>Settings</span></button>
     </nav>
@@ -62,6 +63,35 @@
           <button id="play-source" class="play-source" title="Change it under Settings → Manage game → Game source" hidden><span class="play-source-dot" aria-hidden="true"></span><strong>Custom Game Source</strong><span id="play-source-detail"></span></button><p id="play-more-hint" class="play-more-hint" hidden></p><div id="play-menu" class="play-menu" popover role="menu" aria-label="Ways to play"><button id="menu-default" class="play-menu-item" role="menuitem" data-kind="update"><svg viewBox="0 0 20 20" aria-hidden="true" class="for-update"><path d="M15.5 8.5A6 6 0 0 0 4.6 6.2M4.5 3v3.4h3.4M4.5 11.5a6 6 0 0 0 10.9 2.3M15.5 17v-3.4h-3.4"/></svg><svg viewBox="0 0 20 20" aria-hidden="true" class="for-play"><path d="M6.5 4.5v11l9-5.5z"/></svg><svg viewBox="0 0 20 20" aria-hidden="true" class="for-hd"><rect x="2.8" y="4.5" width="14.4" height="11" rx="2"/><path d="M6 8v4M9 8v4M6 10h3M11.5 8v4h1.3a2 2 0 0 0 0-4z"/></svg><span><strong id="menu-default-label">Update &amp; play</strong><small id="menu-default-detail"></small></span><em>Default</em></button><button id="menu-update-play" class="play-menu-item" role="menuitem"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 8.5A6 6 0 0 0 4.6 6.2M4.5 3v3.4h3.4M4.5 11.5a6 6 0 0 0 10.9 2.3M15.5 17v-3.4h-3.4"/></svg><span><strong>Update &amp; play</strong><small id="menu-update-play-detail"></small></span></button><button id="menu-update-only" class="play-menu-item" role="menuitem"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9.5M6 8.8l4 4 4-4M4 16.5h12"/></svg><span><strong id="menu-update-only-label">Update only</strong><small id="menu-update-only-detail"></small></span></button><button id="menu-play-now" class="play-menu-item" role="menuitem"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z"/></svg><span><strong>Play now</strong><small id="menu-play-now-detail"></small></span></button><p id="play-menu-note">The default follows <b>Update automatically</b> in Settings.</p></div><div class="task-progress" id="task-progress" role="status" hidden><div class="progress-summary"><span class="spinner" aria-hidden="true"></span><strong id="progress-title">Working…</strong><span id="progress-time"></span><span id="progress-percent"></span></div><p id="progress-detail">Starting…</p><div class="progress-track" id="progress-track" role="progressbar" aria-label="Task progress"><span id="progress-fill"></span></div><button id="view-build-log" class="progress-log-button">View build log</button></div>
         </section>
 
+      </section>
+      <section id="page-pokedex" class="page sheet pokedex-page" aria-labelledby="pokedex-title" hidden>
+        <div class="modal-head"><div><h1 id="pokedex-title">Pokédex</h1><p id="pokedex-summary">Every Pokémon on your disc, in 3D.</p></div></div>
+        <div class="pokedex-body">
+          <div class="pokedex-browse">
+            <input id="pokedex-search" class="pokedex-search" type="search" placeholder="Search by name or number" aria-label="Search Pokémon by name or number">
+            <div id="pokedex-filters" class="pokedex-filters" role="group" aria-label="Which Pokémon to show"></div>
+            <div id="pokedex-list" class="pokedex-list" aria-label="Pokémon"></div>
+            <p id="pokedex-empty" class="helper pokedex-empty" hidden>No Pokémon match that search.</p>
+          </div>
+          <div class="pokedex-detail">
+            <div class="pokedex-stage-wrap">
+              <canvas id="pokedex-stage" class="pokedex-stage" tabindex="0" aria-label="The Pokémon's model. Drag or use the arrow keys to turn it, scroll to zoom."></canvas>
+              <div id="pokedex-status" class="pokedex-status" role="status" hidden><span class="pokedex-loader" aria-hidden="true"></span><span id="pokedex-status-text"></span><button id="pokedex-retry" class="solid" hidden>Try again</button></div>
+              <div class="pokedex-stage-controls">
+                <label id="pokedex-form-field" hidden><span>Look</span><select id="pokedex-form"></select></label>
+                <label id="pokedex-motion-field" hidden><span>Motion</span><select id="pokedex-motion"></select></label>
+              </div>
+            </div>
+            <div id="pokedex-info" class="pokedex-info" hidden>
+              <div class="pokedex-heading"><span id="pokedex-number" class="pokedex-number"></span><h2 id="pokedex-name"></h2><span id="pokedex-types" class="pokedex-types"></span></div>
+              <div id="pokedex-availability" class="pokedex-availability"><svg class="pokedex-lock" viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="9" width="12" height="8.5" rx="2"/><path d="M6.5 9V6.5a3.5 3.5 0 0 1 7 0V9"/></svg><div><strong id="pokedex-availability-label"></strong><p id="pokedex-availability-note"></p></div></div>
+              <div class="pokedex-facts">
+                <dl id="pokedex-stats" class="pokedex-stats"></dl>
+                <dl class="pokedex-traits"><dt>Height</dt><dd id="pokedex-height"></dd><dt>Weight</dt><dd id="pokedex-weight"></dd><dt>Abilities</dt><dd id="pokedex-abilities"></dd><dt id="pokedex-evolves-label">Evolves into</dt><dd id="pokedex-evolves"></dd></dl>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
       <section id="page-saves" class="page sheet saves-page" aria-labelledby="saves-title" hidden>
       <div class="modal-head"><div><h1 id="saves-title">Saves</h1><p>Your saved games and their backups.</p></div></div>
@@ -280,5 +310,6 @@
   <script src="changelog-text.js"></script>
   <script src="gamepad-nav.js"></script>
   <script src="renderer.js"></script>
+  <script type="module" src="pokedex-page.js"></script>
 </body>
 </html>

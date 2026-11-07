@@ -1,6 +1,7 @@
 {
   "beta": {
     "launcher": [
+      "Pokédex: browse all 386 Pokémon from your own disc, turn their 3D models around, play their motions and see their shiny looks. It also shows how you can get each one, and locks those the game keeps out of reach. Find it in the new Pokédex tab.",
       "Macs with Apple Silicon: the game now builds as a native program and draws with Metal, so it runs faster and Rosetta is no longer needed. Metal is the new default renderer on these Macs; Vulkan and OpenGL are still under Graphics. Intel Macs stay on Vulkan."
     ],
     "game": [

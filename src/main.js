@@ -25,6 +25,7 @@ const { createSessionLog } = require('./session-log');
 const displayScale = require('./display-scale');
 const steam = require('./steam');
 const crashReports = require('./crash-reports');
+const pokedexData = require('./pokedex').create();
 const { retrying, httpError } = require('./retry');
 
 const GAME_NAME = 'Pokémon Colosseum';
@@ -1216,6 +1217,9 @@ function registerHandlers() {
   });
   ipcMain.handle('window-close', event => senderWindow(event)?.close());
   ipcMain.handle('state', async () => { await checkTools(); return state(); });
+  ipcMain.handle('pokedex', () => pokedexData.list(port.validateRom(config.rom)));
+  ipcMain.handle('pokedex-model', (_event, national, form) => pokedexData.model(port.validateRom(config.rom), Number(national), String(form)));
+  ipcMain.handle('pokedex-clip', (_event, national, form, index) => pokedexData.clip(port.validateRom(config.rom), Number(national), String(form), Number(index)));
   ipcMain.handle('check-tools', async () => { await checkTools(true); return state(); });
   ipcMain.handle('copy-mac-command', (_event, index) => {
     if (process.platform !== 'darwin') throw new Error('This help is for macOS.');
