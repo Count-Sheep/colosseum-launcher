@@ -1429,6 +1429,7 @@ function registerHandlers() {
     return onlineState();
   });
   ipcMain.handle('online-rooms', () => online.listRooms({ fetch: (...args) => net.fetch(...args) }));
+  ipcMain.handle('usage-refresh', () => reporter?.refresh());
   ipcMain.handle('online-create', () => createRoom());
   ipcMain.handle('online-join', (_event, code) => joinRoom(code));
   ipcMain.handle('online-leave', () => leaveRoom());

@@ -88,7 +88,7 @@
               <button id="online-create" class="solid">Create room</button>
             </div>
             <p id="online-blocked" class="helper" hidden></p>
-            <div class="online-heading"><h2 class="group-title">Rooms</h2>
+            <div class="online-heading"><h2 class="group-title">Rooms</h2><button id="online-refresh" class="subtle" title="Check for new rooms and the online count now">Refresh</button>
               <form id="online-code-form" class="online-code"><input id="online-code" class="online-input" type="text" maxlength="7" placeholder="Room code" spellcheck="false" autocomplete="off" aria-label="Room code"><button id="online-code-join" class="subtle">Join</button></form>
             </div>
             <div id="online-rooms" class="online-room-list" aria-live="polite"></div>
@@ -373,6 +373,7 @@
   <script src="gamepad-nav.js"></script>
   <script src="renderer.js"></script>
   <script type="module" src="pokedex-page.js"></script>
+  <script src="room-poll.js"></script>
   <script src="online-page.js"></script>
 </body>
 </html>

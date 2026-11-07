@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('colo', {
   randomizerSpoilers: () => ipcRenderer.invoke('randomizer-spoilers'),
   onlineSave: value => ipcRenderer.invoke('online-save', value),
   onlineRooms: () => ipcRenderer.invoke('online-rooms'),
+  usageRefresh: () => ipcRenderer.invoke('usage-refresh'),
   onlineCreate: () => ipcRenderer.invoke('online-create'),
   onlineJoin: code => ipcRenderer.invoke('online-join', code),
   onlineLeave: () => ipcRenderer.invoke('online-leave'),

@@ -689,6 +689,7 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .online-column { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
 .online-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
 .online-heading .group-title { margin: 0; }
+.online-heading #online-refresh { margin-right: auto; padding: 5px 11px; }
 .online-field { display: grid; gap: 4px; color: #6a5163; font-size: 11px; font-weight: 700; }
 .online-input { width: 100%; padding: 7px 10px; border: 1px solid var(--dex-line); border-radius: 7px; background: var(--dex-panel); color: inherit; font: inherit; font-size: 13px; font-weight: 500; }
 .online-input:focus-visible { outline: 2px solid var(--dex-accent); outline-offset: 1px; }

@@ -140,7 +140,7 @@ Both players need the same build of the game. A room on another version says whi
 
 ### Privacy
 
-The launcher sends nothing personal. Every few minutes it checks in with the online count server: your launcher and game versions, OS, update channel, whether the game is running, and a random ID made on first run. That's what the online count in the top bar is made from. Turn off **Share anonymous usage** under Settings → Launcher and you'll still see the count, without being part of it. An online room passes your trainer name and party to the other player through that server, and no address is stored. Otherwise the launcher talks to GitHub and the port's GitLab for updates, the setup files and the HD textures. Your disc image never leaves your computer.
+The launcher sends nothing personal. Every 10 minutes it checks in with the online count server: your launcher and game versions, OS, update channel, whether the game is running, and a random ID made on first run. That's what the online count in the top bar is made from. Turn off **Share anonymous usage** under Settings → Launcher and you'll still see the count, without being part of it. An online room passes your trainer name and party to the other player through that server, and no address is stored. Otherwise the launcher talks to GitHub and the port's GitLab for updates, the setup files and the HD textures. Your disc image never leaves your computer.
 
 ## Need help?
 

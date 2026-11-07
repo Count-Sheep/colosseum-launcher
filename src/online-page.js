@@ -2,11 +2,12 @@
 // game itself are the main process's (src/online.js); this page shows them and asks.
 (() => {
   const $ = id => document.getElementById(id);
-  const PARTY_SIZE = 6, POLL = 5000;
+  const PARTY_SIZE = 6, NO_ROOMS = 'No rooms are open. Create one and wait for a challenger.';
+  const REFRESH_REST = 3000; // ms before Refresh works again: the server's list is this old at best
   const message = error => String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
   const number = national => `#${String(national).padStart(3, '0')}`;
 
-  let state = null, setup = null, species = null, loadingSpecies = null, showing = false, poll = null, editing = null;
+  let state = null, setup = null, species = null, loadingSpecies = null, rooms = null, editing = null;
   const byId = new Map();
 
   async function loadSpecies() {
@@ -142,8 +143,9 @@
 
   const rulesText = rules => `Level ${rules.level}, ${rules.size} Pokémon each`;
 
-  function renderRooms(rooms) {
+  function renderRooms() {
     const busy = Boolean(state.battle) || Boolean(state.ready);
+    $('online-rooms-empty').textContent = NO_ROOMS;
     $('online-rooms-empty').hidden = rooms.length > 0;
     $('online-rooms').replaceChildren(...rooms.map(room => {
       // Both games play the same battle, so a room takes the same build of the game only.
@@ -160,10 +162,28 @@
     }));
   }
 
-  async function refreshRooms() {
+  // What the poll compares. Not the whole list: a room's minutes change by themselves.
+  async function loadRooms() {
+    try {
+      rooms = await window.colo.onlineRooms();
+      renderRooms();
+      return rooms.map(room => `${room.code} ${room.status}`).join();
+    } catch (error) {
+      $('online-rooms-empty').textContent = 'Couldn\'t reach the room server.';
+      $('online-rooms-empty').hidden = false;
+      throw error;
+    }
+  }
+
+  const poll = window.coloRoomPoll.createRoomPoll({ load: loadRooms,
+    paused: () => !state || Boolean(state.battle) || document.hidden });
+
+  async function refreshNow() {
     if (!state) return;
-    try { renderRooms(await window.colo.onlineRooms()); }
-    catch (_) { $('online-rooms-empty').textContent = 'Couldn\'t reach the room server.'; $('online-rooms-empty').hidden = false; }
+    $('online-refresh').disabled = true;
+    window.colo.usageRefresh();
+    await Promise.all([poll.refresh(), new Promise(resolve => setTimeout(resolve, REFRESH_REST))]);
+    $('online-refresh').disabled = false;
   }
 
   async function createRoom() {
@@ -217,6 +237,8 @@
   $('online-trainer').addEventListener('change', event => { setup.trainer = event.target.value; save(); });
   $('online-create').addEventListener('click', createRoom);
   $('online-leave').addEventListener('click', () => window.colo.onlineLeave());
+  $('online-refresh').addEventListener('click', refreshNow);
+  document.addEventListener('visibilitychange', () => poll.wake());
   $('online-code-form').addEventListener('submit', event => {
     event.preventDefault();
     if ($('online-code').value.trim()) joinRoom($('online-code').value);
@@ -225,7 +247,8 @@
   window.colo.onOnline(next => {
     state = next;
     render();
-    if (showing) refreshRooms();
+    if (rooms) renderRooms();
+    poll.wake();
   });
   function renderCount(count) {
     if (!count) return;
@@ -237,20 +260,14 @@
     state = data.online;
     renderCount(data.usage);
     render();
-    if (showing) refreshRooms();
+    poll.wake();
   });
 
   window.coloOnline = {
     show() {
-      showing = true;
       if (!species) loadingSpecies ||= loadSpecies();
-      refreshRooms();
-      clearInterval(poll);
-      poll = setInterval(refreshRooms, POLL);
+      poll.start();
     },
-    hide() {
-      showing = false;
-      clearInterval(poll);
-    }
+    hide() { poll.stop(); }
   };
 })();

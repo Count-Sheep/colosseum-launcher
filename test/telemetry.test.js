@@ -6,7 +6,7 @@ const telemetry = require('../src/telemetry');
 
 const ID = '0b6f7c1e-5d1a-4c3e-9f2a-6a8b0c9d1e2f';
 
-function harness({ sharing = true, respond = () => ({ ok: true, json: async () => ({ online: 3, playing: 1 }) }) } = {}) {
+function harness({ sharing = true, respond = () => ({ ok: true, json: async () => ({ online: 3, playing: 1 }) }), now } = {}) {
   const requests = [], counts = [], timers = [];
   const state = { sharing };
   const reporter = telemetry.createReporter({
@@ -15,7 +15,8 @@ function harness({ sharing = true, respond = () => ({ ok: true, json: async () =
     getPayload: () => telemetry.payload({ installId: ID, launcherVersion: '0.1.51', channel: 'stable' }, 'linux', 'x64'),
     onCount: count => counts.push(count),
     setInterval: (callback, ms) => { timers.push({ callback, ms }); return timers.length; },
-    clearInterval: id => { timers[id - 1].cleared = true; }
+    clearInterval: id => { timers[id - 1].cleared = true; },
+    ...(now ? { now } : {})
   });
   return { reporter, requests, counts, timers, state };
 }
@@ -61,6 +62,24 @@ test('sharing sends a heartbeat right away, then every interval, and reports the
   assert.equal(requests.length, 3);
   reporter.stop();
   assert.equal(timers[0].cleared, true);
+});
+
+test('the interval is 10 minutes, which the server\'s online window is built on', () => {
+  assert.equal(telemetry.INTERVAL, 10 * 60 * 1000);
+});
+
+test('Refresh asks for the count, but not again within a minute', async () => {
+  let time = 5000;
+  const { reporter, requests } = harness({ now: () => time });
+  await reporter.start();
+  await reporter.refresh();
+  assert.equal(requests.length, 1, 'just asked');
+  time += telemetry.REFRESH_REST - 1;
+  await reporter.refresh();
+  assert.equal(requests.length, 1);
+  time += 1;
+  await reporter.refresh();
+  assert.equal(requests.length, 2);
 });
 
 test('with sharing off only the public count is asked for', async () => {

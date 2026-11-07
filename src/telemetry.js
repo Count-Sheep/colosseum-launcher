@@ -6,7 +6,10 @@
 // Players who turn sharing off still see the count, but are not part of it.
 // COLO_TELEMETRY_URL overrides it for testing.
 const TELEMETRY_URL = 'https://colosseum-launcher-telemetry.chasemdev.workers.dev';
-const INTERVAL = 5 * 60 * 1000;
+// colosseum-server-api counts a launcher as online for two of these (ONLINE_WINDOW): change them together.
+const INTERVAL = 10 * 60 * 1000;
+// The server's count can be a minute old, so asking sooner than this shows nothing new.
+const REFRESH_REST = 60 * 1000;
 const INSTALL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function endpoint(env = process.env) {
@@ -29,9 +32,10 @@ function onlineCount(body) {
 // Each tick sends a heartbeat when sharing is on, or only asks for the count
 // when it is off. Offline or failed requests keep the last count.
 function createReporter({ url, fetch, sharing, getPayload, onCount, intervalMs = INTERVAL,
-  setInterval = global.setInterval, clearInterval = global.clearInterval }) {
-  let timer = null;
+  setInterval = global.setInterval, clearInterval = global.clearInterval, now = () => Date.now() }) {
+  let timer = null, tickedAt = -Infinity;
   async function tick() {
+    tickedAt = now();
     try {
       const response = sharing()
         ? await fetch(`${url}/v1/heartbeat`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -44,6 +48,8 @@ function createReporter({ url, fetch, sharing, getPayload, onCount, intervalMs =
   }
   return {
     tick,
+    // The player asked for the count now.
+    refresh() { return now() - tickedAt >= REFRESH_REST ? tick() : Promise.resolve(); },
     start() {
       if (!timer) timer = setInterval(tick, intervalMs);
       return tick();
@@ -55,4 +61,4 @@ function createReporter({ url, fetch, sharing, getPayload, onCount, intervalMs =
   };
 }
 
-module.exports = { TELEMETRY_URL, INTERVAL, endpoint, validInstallId, payload, onlineCount, createReporter };
+module.exports = { TELEMETRY_URL, INTERVAL, REFRESH_REST, endpoint, validInstallId, payload, onlineCount, createReporter };
