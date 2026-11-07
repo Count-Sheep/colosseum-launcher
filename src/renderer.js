@@ -611,7 +611,12 @@ function refresh(data) {
   $('backup-list').disabled = Boolean(data.active) || !data.backups.length;
 
   changing = true;
-  $('renderer-field').hidden = !(platform.renderers || []).includes('vulkan');
+  const renderers = platform.renderers || [];
+  $('renderer-field').hidden = !renderers.includes('vulkan');
+  $('metal-renderer').hidden = !renderers.includes('metal');
+  $('renderer-note').textContent = renderers.includes('metal')
+    ? "Metal is this Mac's own graphics, and the fastest here. Choose Vulkan or OpenGL if the game has trouble drawing."
+    : "Vulkan is the port's main renderer. Choose OpenGL if the game has trouble drawing on this computer.";
   renderExclusiveResolutions(config.settings.exclusiveResolution);
   renderDisplays(config.settings.display);
   renderUpdateChannels(config.settings.updateChannel);

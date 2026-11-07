@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const release = require('./game-release.json');
 
 function executable(file) {
   try { fs.accessSync(file, fs.constants.X_OK); return fs.statSync(file).isFile(); }
@@ -67,15 +68,15 @@ function newerFirst(a, b) {
 // Command Line Tools can install an SDK newer than their linker can read
 // (ld: tapi error: malformed file). Keep the default SDK when Apple's linker
 // accepts it; otherwise use the newest versioned SDK beside it that links.
-async function linkableSdk(defaultSdk, env, run, list) {
+async function linkableSdk(defaultSdk, env, run, list, arch) {
   const directory = path.posix.dirname(defaultSdk);
   const versioned = list(directory).map(name => name.match(/^MacOSX(\d+(?:\.\d+)*)\.sdk$/)).filter(Boolean)
     .sort((a, b) => newerFirst(a[1], b[1])).map(match => path.posix.join(directory, match[0]));
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'colo-sdk-'));
   try {
     for (const sdk of [...new Set([defaultSdk, ...versioned])]) {
-      // The game is x86_64 C++, so link libc++ and libSystem the same way.
-      const linked = await run('/usr/bin/clang++', ['-arch', 'x86_64', '-isysroot', sdk, '-dynamiclib',
+      // The game is C++ for this Mac's processor, so link libc++ and libSystem the same way.
+      const linked = await run('/usr/bin/clang++', ['-arch', arch, '-isysroot', sdk, '-dynamiclib',
         '-x', 'c++', '/dev/null', '-o', path.join(scratch, 'probe.dylib')], { ...env, SDKROOT: sdk });
       if (linked.ok) return sdk;
     }
@@ -85,7 +86,8 @@ async function linkableSdk(defaultSdk, env, run, list) {
 
 // timeout: how long each tool may take to start. Freshly unpacked programs can
 // take seconds the first time, while macOS checks them.
-async function inspect(base = process.env, { run = probe, exists = executable, list = listSdks, timeout = 10000 } = {}) {
+// rosetta: the game is x86-64 on every Mac, so Apple Silicon needs Rosetta 2 (port.js, gameArch).
+async function inspect(base = process.env, { run = probe, exists = executable, list = listSdks, timeout = 10000, cpu = process.arch, rosetta: needsRosetta = release.rosetta } = {}) {
   const env = environment(base, exists);
   const runTool = (command, args) => {
     const file = find(command, env, exists);
@@ -93,7 +95,7 @@ async function inspect(base = process.env, { run = probe, exists = executable, l
   };
   const [sdk, silicon, cmake, objcopy, nm, lld, brew] = await Promise.all([
     run('/usr/bin/xcrun', ['--sdk', 'macosx', '--show-sdk-path'], env, timeout),
-    run('/usr/sbin/sysctl', ['-n', 'hw.optional.arm64'], env, timeout),
+    needsRosetta ? run('/usr/sbin/sysctl', ['-n', 'hw.optional.arm64'], env, timeout) : { stdout: '' },
     runTool('cmake', ['--version']), runTool('llvm-objcopy', ['--version']), runTool('llvm-nm', ['--version']), runTool('ld.lld', ['--version']),
     // Homebrew is useful for fixing missing packages, but is not itself required.
     Promise.resolve(Boolean(find('brew', env, exists)))
@@ -107,7 +109,8 @@ async function inspect(base = process.env, { run = probe, exists = executable, l
     Promise.all(['clang', 'clang++'].map(command => sdk.ok || find(command, env, exists) !== `/usr/bin/${command}`
       ? runTool(command, ['--version']) : { ok: false }))
   ]);
-  const sdkPath = sdk.ok && sdk.stdout ? await linkableSdk(sdk.stdout, env, (...args) => run(...args, timeout), list) : '';
+  const sdkPath = sdk.ok && sdk.stdout
+    ? await linkableSdk(sdk.stdout, env, (...args) => run(...args, timeout), list, cpu === 'arm64' && !needsRosetta ? 'arm64' : 'x86_64') : '';
   const cmakeVersion = cmake.stdout.match(/cmake version (\d+)\.(\d+)/);
   const cmakeReady = cmake.ok && Boolean(cmakeVersion) &&
     (Number(cmakeVersion[1]) > 3 || Number(cmakeVersion[1]) === 3 && Number(cmakeVersion[2]) >= 20);

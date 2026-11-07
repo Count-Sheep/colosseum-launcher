@@ -147,7 +147,7 @@
             <p class="preset-tip"><strong>Still seeing frame drops?</strong> Try a lower screen resolution: under Display, set <strong>Fullscreen type</strong> to Exclusive and choose a lower <strong>Fullscreen resolution</strong>.</p>
             <h2 class="group-title">Quality</h2>
             <div class="settings-group">
-              <label class="field" id="renderer-field"><span><strong>Renderer</strong><small id="renderer-note">Vulkan is the port's main renderer. Choose OpenGL if the game has trouble drawing on this computer.</small></span><select id="renderer"><option value="vulkan">Vulkan</option><option value="opengl">OpenGL</option></select></label>
+              <label class="field" id="renderer-field"><span><strong>Renderer</strong><small id="renderer-note">Vulkan is the port's main renderer. Choose OpenGL if the game has trouble drawing on this computer.</small></span><select id="renderer"><option value="metal" id="metal-renderer" hidden>Metal</option><option value="vulkan">Vulkan</option><option value="opengl">OpenGL</option></select></label>
               <label class="field"><span>Resolution<small>Sharper picture, but costs speed and memory. Native is the GameCube's own.</small></span><select id="resolution"><option value="1">Native (1×)</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option></select></label>
               <label class="field"><span>Anti-aliasing</span><select id="msaa"><option value="0">Off</option><option value="2">2× MSAA</option><option value="4">4× MSAA</option><option value="8">8× MSAA</option></select></label>
               <label class="switch"><span><strong>FXAA</strong><small>Also smooths edges MSAA misses, like leaves and fences.</small></span><input id="fxaa" type="checkbox"><i></i></label>
@@ -242,7 +242,7 @@
         <ul id="mac-requirements" class="mac-requirements" aria-live="polite"></ul>
         <p id="mac-apple-note" class="mac-help-intro" hidden>Start with the Apple command below. Finish the installer that opens before continuing.</p>
         <div id="mac-apple-command"></div>
-        <p id="mac-extra-note" class="mac-help-intro" hidden>Open Terminal and run each remaining command below. Rosetta may ask you to accept Apple's license.</p>
+        <p id="mac-extra-note" class="mac-help-intro" hidden>Open Terminal and run each remaining command below.</p>
         <div id="mac-extra-commands"></div>
         <div class="actions mac-check-actions"><button id="check-mac-tools" class="solid">Check again</button><span id="mac-check-result" role="status"></span></div>
       </div>

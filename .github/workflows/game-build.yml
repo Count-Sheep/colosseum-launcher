@@ -1,6 +1,6 @@
 name: Game build
 # Builds the game the way the launcher does for players, with its private toolsets: Linux, Windows, and
-# Intel and Apple Silicon Macs (the game is x86_64 on both; Rosetta 2 runs it on Apple Silicon). Each build
+# Intel and Apple Silicon Macs (native on both, x86_64 and arm64, unless game-release.json marks the game "rosetta"). Each build
 # starts the game far enough to reach its disc check. No disc image is used and no game binary is published.
 # It runs for pull requests, before every release (release.yml) and Beta (build.yml), and weekly, so a change to GitHub's runners,
 # the toolsets or a repository the game builds from shows up.
@@ -95,9 +95,12 @@ jobs:
         run: echo "::notice::These exact inputs already built and started on ${{ matrix.os }}, so this run skips the build."
       - run: npm ci --ignore-scripts
         if: steps.passed.outputs.cache-hit != 'true'
-      - name: Enable Intel execution on the Apple Silicon runner
+      - name: Enable Intel execution on the Apple Silicon runner, for a game that needs it
         if: matrix.os == 'macos-15' && steps.passed.outputs.cache-hit != 'true'
-        run: sudo softwareupdate --install-rosetta --agree-to-license
+        run: |
+          if [ "$(node -p "require('./src/game-release.json').rosetta === true")" = true ]; then
+            sudo softwareupdate --install-rosetta --agree-to-license
+          fi
       # One archive per system, restored from the newest on main and saved by every run that isn't for a pull
       # request, so pull requests read main's but can't fill the repository's 10 GB. The build goes through it as a
       # player's does (src/compiler-cache.js): the folder has a space in its name, as players' often do.

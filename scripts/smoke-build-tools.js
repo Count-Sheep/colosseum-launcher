@@ -25,7 +25,8 @@ function executableType(file) {
     fs.readSync(fd, header, 0, header.length, 0);
     if (header.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46])))
       return header[4] === 2 && header.readUInt16LE(18) === 62 ? 'ELF x86-64' : 'other ELF';
-    if (header.readUInt32LE(0) === 0xfeedfacf) return header.readUInt32LE(4) === 0x01000007 ? 'Mach-O x86-64' : 'other Mach-O';
+    if (header.readUInt32LE(0) === 0xfeedfacf)
+      return { 0x01000007: 'Mach-O x86-64', 0x0100000c: 'Mach-O arm64' }[header.readUInt32LE(4)] || 'other Mach-O';
     if (header.readUInt16LE(0) === 0x5a4d) {
       const pe = Buffer.alloc(32);
       fs.readSync(fd, pe, 0, pe.length, header.readUInt32LE(0x3c));
@@ -34,7 +35,8 @@ function executableType(file) {
     return 'unknown';
   } finally { fs.closeSync(fd); }
 }
-const EXPECTED = { linux: 'ELF x86-64', win32: 'PE x86-64', darwin: 'Mach-O x86-64' };
+// (a Mac's game goes by the processor it runs on, unless it is a game for Rosetta: port.js, gameArch)
+const EXPECTED = { linux: 'ELF x86-64', win32: 'PE x86-64', darwin: port.gameArch() === 'arm64' ? 'Mach-O arm64' : 'Mach-O x86-64' };
 
 // Some players' System32 holds older DLLs named like the build tools' own (libwinpthread-1.dll, zlib1.dll...),
 // which Windows loads before the PATH's: GCC then fails without a message. A real system DLL under those names

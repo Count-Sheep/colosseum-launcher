@@ -43,20 +43,53 @@ test('a CISO is refused, as the port reads raw disc images only, and other forma
 });
 
 test('defaults are the port\'s HD settings on every system', () => {
-  for (const platform of ['linux', 'darwin', 'win32']) {
-    const settings = port.normalizeSettings({}, platform);
+  for (const [platform, arch, renderer] of [['linux', 'x64', 'vulkan'], ['darwin', 'arm64', 'metal'], ['darwin', 'x64', 'vulkan'], ['win32', 'x64', 'vulkan']]) {
+    const settings = port.normalizeSettings({}, platform, arch);
     assert.deepEqual([settings.renderer, settings.resolution, settings.frameRate, settings.widescreen, settings.anisotropic, settings.textures],
-      ['vulkan', 4, 60, 'auto', 16, true]);
+      [renderer, 4, 60, 'auto', 16, true]);
   }
 });
 
+test('a game marked for Rosetta is x86-64 on every Mac, so Apple Silicon has no Metal until the mark goes', () => {
+  assert.equal(port.gameArch('arm64', { rosetta: true }), 'x64');
+  assert.equal(port.gameArch('arm64', {}), 'arm64');
+  assert.equal(port.gameArch('x64', {}), 'x64');
+  const arch = port.gameArch('arm64', { rosetta: true });
+  assert.deepEqual(port.platformInfo('darwin', arch).renderers, ['vulkan', 'opengl']);
+  assert.equal(port.normalizeSettings({ renderer: 'metal' }, 'darwin', arch).renderer, 'vulkan');
+  assert.equal(port.moveToMetal(port.normalizeSettings({ renderer: 'vulkan' }, 'darwin', arch), undefined, 'darwin', arch).renderer, 'vulkan');
+});
+
+test('only Apple Silicon has Metal, and the game is told the renderer chosen', () => {
+  assert.deepEqual(port.platformInfo('darwin', 'arm64').renderers, ['metal', 'vulkan', 'opengl']);
+  assert.deepEqual(port.platformInfo('darwin', 'x64').renderers, ['vulkan', 'opengl']);
+  assert.equal(port.normalizeSettings({ renderer: 'metal' }, 'darwin', 'x64').renderer, 'vulkan');
+  for (const platform of ['linux', 'win32']) assert.equal(port.normalizeSettings({ renderer: 'metal' }, platform).renderer, 'vulkan');
+  for (const renderer of ['metal', 'vulkan', 'opengl']) {
+    const settings = port.normalizeSettings({ renderer }, 'darwin', 'arm64');
+    assert.equal(settings.renderer, renderer);
+    assert.equal(port.buildEnvironment(settings, '/disc.iso', '/game').SMS_GX_BACKEND, renderer);
+  }
+});
+
+test('Apple Silicon moves off the old default Vulkan once, a later choice stays, and an Intel Mac stays on Vulkan', () => {
+  const vulkan = port.normalizeSettings({ renderer: 'vulkan' }, 'darwin', 'arm64');
+  assert.equal(port.moveToMetal(vulkan, undefined, 'darwin', 'arm64').renderer, 'metal');
+  assert.equal(port.moveToMetal(vulkan, true, 'darwin', 'arm64').renderer, 'vulkan');
+  assert.equal(port.moveToMetal(vulkan, undefined, 'darwin', 'x64').renderer, 'vulkan');
+  const opengl = port.normalizeSettings({ renderer: 'opengl' }, 'darwin', 'arm64');
+  assert.equal(port.moveToMetal(opengl, undefined, 'darwin', 'arm64').renderer, 'opengl');
+  const linux = port.normalizeSettings({ renderer: 'vulkan' }, 'linux');
+  assert.equal(port.moveToMetal(linux, undefined, 'linux').renderer, 'vulkan');
+});
+
 test('settings outside what the game takes fall back', () => {
-  const settings = port.normalizeSettings({ frameRate: 120, resolution: 9, widescreen: '5:4', renderer: 'metal', stickDeadzone: 99, display: 'monitor99',
+  const settings = port.normalizeSettings({ frameRate: 120, resolution: 9, widescreen: '5:4', renderer: 'direct3d', stickDeadzone: 99, display: 'monitor99',
     exclusiveResolution: 'big', hdText: 'maybe', padMode: 'all' });
   assert.equal(settings.frameRate, 60);
   assert.equal(settings.resolution, 4);
   assert.equal(settings.widescreen, 'auto');
-  assert.equal(settings.renderer, 'vulkan');
+  assert.equal(settings.renderer, port.platformInfo().renderers[0]);
   assert.equal(settings.stickDeadzone, 50);
   assert.equal(settings.display, 'launcher');
   assert.equal(settings.exclusiveResolution, 'desktop');
@@ -67,7 +100,7 @@ test('settings outside what the game takes fall back', () => {
 test('the game gets run.sh\'s settings by default', () => {
   const env = port.buildEnvironment(port.normalizeSettings({}), '/my/disc.iso', '/port');
   assert.equal(env.COLO_DISC, '/my/disc.iso');
-  assert.equal(env.SMS_GX_BACKEND, 'vulkan');
+  assert.equal(env.SMS_GX_BACKEND, port.platformInfo().renderers[0]);
   assert.equal(env.SMS_GX_SCALE, '4');
   assert.equal(env.COLO_FPS, '60');
   assert.equal(env.COLO_WIDESCREEN, 'auto');

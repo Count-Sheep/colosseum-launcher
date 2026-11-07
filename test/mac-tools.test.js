@@ -5,8 +5,8 @@ const assert = require('node:assert/strict');
 const mac = require('../src/mac-tools');
 const tools = require('../src/build-tools');
 
-function fixture({ prefix = '/opt/homebrew', missing = [], sdk = true, silicon = true,
-  rosetta = true, cmakeVersion = '3.31.6', sdks = [], unlinkable = [] } = {}) {
+function fixture({ prefix = '/opt/homebrew', missing = [], sdk = true, cpu = 'arm64', rosetta = false, rosettaWorks = true,
+  cmakeVersion = '3.31.6', sdks = [], unlinkable = [] } = {}) {
   const files = new Set([
     ...['git', 'make', 'patch', 'curl', 'hdiutil', 'clang', 'clang++', 'python3'].map(name => `/usr/bin/${name}`),
     ...['brew', 'cmake', 'python3'].map(name => `${prefix}/bin/${name}`),
@@ -18,13 +18,13 @@ function fixture({ prefix = '/opt/homebrew', missing = [], sdk = true, silicon =
   const run = async (command, args, env) => {
     calls.push({ command, args, env });
     if (command === '/usr/bin/xcrun') return { ok: sdk, stdout: sdk ? '/SDK/MacOSX.sdk' : '' };
-    if (command === '/usr/sbin/sysctl') return { ok: true, stdout: silicon ? '1' : '0' };
-    if (command === '/usr/bin/arch') return { ok: rosetta, stdout: '' };
+    if (command === '/usr/sbin/sysctl') return { ok: true, stdout: cpu === 'arm64' ? '1' : '0' };
+    if (command === '/usr/bin/arch') return { ok: rosettaWorks, stdout: '' };
     if (args.includes('-isysroot')) return { ok: !unlinkable.includes(args[args.indexOf('-isysroot') + 1]), stdout: '' };
     if (!command || !exists(command)) return { ok: false, stdout: '' };
     return { ok: true, stdout: command.endsWith('/cmake') ? `cmake version ${cmakeVersion}` : 'version' };
   };
-  return { exists, list, run, calls };
+  return { exists, list, run, calls, cpu, rosetta };
 }
 
 test('Finder PATH resolves Homebrew tools on both Mac architectures without changing the parent environment', async () => {
@@ -42,22 +42,37 @@ test('Finder PATH resolves Homebrew tools on both Mac architectures without chan
 
 test('fresh Mac is not ready and gets instructions for every missing requirement', async () => {
   assert.equal(tools.status('/unused', 'darwin').ready, false);
-  const fake = fixture({ sdk: false, rosetta: false,
-    missing: ['cmake', 'python3', 'llvm-objcopy', 'brew'] });
+  const fake = fixture({ sdk: false, missing: ['cmake', 'python3', 'llvm-objcopy', 'brew'] });
   const report = mac.report(await mac.inspect({ PATH: '/usr/bin:/bin' }, fake));
   assert.equal(report.ready, false);
   assert.equal(report.needsHomebrew, true);
-  assert.equal(report.commands, 'xcode-select --install\nsoftwareupdate --install-rosetta\nbrew install cmake python3 llvm lld');
+  assert.equal(report.commands, 'xcode-select --install\nbrew install cmake python3 llvm lld');
   assert.match(report.message, /CMake/);
 });
 
-test('SDK and Rosetta are verified even when compiler executables exist', async () => {
-  for (const options of [{ sdk: false }, { rosetta: false }]) {
-    const report = mac.report(await mac.inspect({}, fixture(options)));
-    assert.equal(report.ready, false);
-    assert.deepEqual(report.requirements.filter(item => !item.ready && !item.optional).map(item => item.id),
-      [options.sdk === false ? 'apple' : 'rosetta']);
-  }
+test('the SDK is verified even when compiler executables exist', async () => {
+  const report = mac.report(await mac.inspect({}, fixture({ sdk: false })));
+  assert.equal(report.ready, false);
+  assert.deepEqual(report.requirements.filter(item => !item.ready && !item.optional).map(item => item.id), ['apple']);
+});
+
+test('the game is native on Apple Silicon, so setup neither needs nor mentions Rosetta', async () => {
+  const fake = fixture();
+  const report = mac.report(await mac.inspect({}, fake));
+  assert.equal(report.ready, true);
+  assert.ok(!report.requirements.some(item => /rosetta/i.test(`${item.id} ${item.label}`)));
+  assert.ok(!fake.calls.some(call => call.command === '/usr/bin/arch'));
+});
+
+test('a game marked for Rosetta keeps it on Apple Silicon: setup checks for it, and the SDK is checked for x86_64', async () => {
+  const fake = fixture({ rosetta: true, rosettaWorks: false, sdks: ['MacOSX.sdk'] });
+  const report = mac.report(await mac.inspect({}, fake));
+  assert.equal(report.ready, false);
+  assert.deepEqual(report.requirements.filter(item => !item.ready).map(item => item.id), ['rosetta']);
+  assert.equal(report.commands, 'softwareupdate --install-rosetta');
+  assert.ok(fake.calls.find(call => call.args.includes('-isysroot')).args.includes('x86_64'));
+  assert.equal(mac.report(await mac.inspect({}, fixture({ rosetta: true }))).ready, true);
+  assert.ok(!mac.report(await mac.inspect({}, fixture({ rosetta: true, cpu: 'x64' }))).requirements.some(item => item.id === 'rosetta'));
 });
 
 test('rejects old CMake', async () => {
@@ -72,9 +87,9 @@ test('supports an explicit Homebrew prefix for tools installed outside the defau
 });
 
 test('private tools take priority and managed setup asks only for Apple installs', async () => {
-  const fake = fixture({ sdk: false, rosetta: false, missing: ['cmake', 'python3', 'llvm-objcopy', 'brew'] });
+  const fake = fixture({ sdk: false, missing: ['cmake', 'python3', 'llvm-objcopy', 'brew'] });
   const report = mac.report(await mac.inspect({ PATH: '/usr/bin:/bin' }, fake), { managed: true });
-  assert.equal(report.commands, 'xcode-select --install\nsoftwareupdate --install-rosetta');
+  assert.equal(report.commands, 'xcode-select --install');
   assert.equal(report.needsHomebrew, false);
   assert.ok(!fake.calls.some(call => ['/usr/bin/git', '/usr/bin/python3', '/usr/bin/clang', '/usr/bin/clang++'].includes(call.command)));
   const env = mac.environment({ PATH: '/usr/bin:/bin', COLO_BUILD_TOOLS_BIN: '/Users/player/Library/Application Support/Colosseum Launcher/build-tools/macos-arm64/env/bin' }, fixture().exists);
@@ -87,7 +102,16 @@ test('keeps the default SDK when Apple\'s linker accepts it', async () => {
   assert.equal(inspection.sdkPath, '/SDK/MacOSX.sdk');
   const probes = fake.calls.filter(call => call.args.includes('-isysroot'));
   assert.deepEqual(probes.map(call => [call.command, call.env.SDKROOT]), [['/usr/bin/clang++', '/SDK/MacOSX.sdk']]);
-  assert.ok(probes[0].args.includes('x86_64'));
+  assert.ok(probes[0].args.includes('arm64'));
+});
+
+test('the SDK is checked for the processor the game is built for', async () => {
+  const silicon = fixture({ sdks: ['MacOSX.sdk'] });
+  await mac.inspect({}, silicon);
+  assert.ok(silicon.calls.find(call => call.args.includes('-isysroot')).args.includes('arm64'));
+  const fake = fixture({ cpu: 'x64', sdks: ['MacOSX.sdk'] });
+  await mac.inspect({}, fake);
+  assert.ok(fake.calls.find(call => call.args.includes('-isysroot')).args.includes('x86_64'));
 });
 
 test('uses the newest installed SDK that links when the default is newer than the linker', async () => {
