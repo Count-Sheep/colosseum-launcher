@@ -8,7 +8,8 @@
     ],
     "game": [
       "Randomizer: a new save can be a randomized run, and the save keeps its seed.",
-      "Macs with Apple Silicon: the game runs natively, and the wipe into a trainer battle plays in full instead of going black."
+      "Macs with Apple Silicon: the game runs natively, and the wipe into a trainer battle plays in full instead of going black.",
+      "Fixed the game not opening its window on Linux with newer graphics drivers, and that error calling the game Super Mario Sunshine."
     ]
   },
   "releases": [
