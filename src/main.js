@@ -21,7 +21,7 @@ const portable = require('./portable');
 const changelog = require('./changelog');
 const { cleanOutputLine, createActivityReader } = require('./progress');
 const { createActivityLog } = require('./activity-log');
-const { observeProcess, exitDescription, failureMessage } = require('./process-output');
+const { observeProcess, exitDescription, failureMessage, taskEnvironment } = require('./process-output');
 const { createSessionLog } = require('./session-log');
 const displayScale = require('./display-scale');
 const steam = require('./steam');
@@ -499,7 +499,8 @@ async function launch(command, args, options = {}, label = 'Task', isGame = fals
     // Python writes UTF-8, as this log reads it: on Windows it otherwise uses
     // the system code page, and cp1251 can't print the "ñ" in "Español".
     const child = spawn(command, args, { ...options, detached: process.platform !== 'win32' || windowsGame,
-      env: { ...(options.env || process.env), PYTHONUNBUFFERED: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+      env: { ...(isGame ? options.env || process.env : taskEnvironment(options.env || process.env)),
+        PYTHONUNBUFFERED: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
       windowsHide: !windowsGame, stdio: ['ignore', 'pipe', 'pipe'] });
     active = { label, child, detail: label.includes('build tools') ? 'Downloading and preparing tools…' : 'Starting…',
       percent: null, startedAt: Date.now() };
@@ -534,7 +535,7 @@ async function launch(command, args, options = {}, label = 'Task', isGame = fals
 async function capture(command, args, cwd, env = process.env) {
   try {
     log(`▶ ${command} ${args.join(' ')}`);
-    const child = spawn(command, args, { cwd, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, env: taskEnvironment(env), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     const { error, code, signal, stdout, stderr } = await observeProcess(child, { output: logOutput, line: completeOutput, capture: true });
     if (error) throw error;
     if (code !== 0 || signal) throw new Error(`${exitDescription(command, code, signal)}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);

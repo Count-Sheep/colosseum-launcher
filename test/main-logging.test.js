@@ -153,6 +153,28 @@ test('Windows starts the game detached, not hidden, so its window shows', async 
   assert.equal(spawned[1].options.detached, false);
 });
 
+test('Steam\'s overlay in LD_PRELOAD reaches the game but not the launcher\'s tasks', async t => {
+  const { EventEmitter } = require('node:events');
+  const { PassThrough } = require('node:stream');
+  const spawned = [];
+  const childProcess = { spawn(command, args, options) {
+    spawned.push(options.env);
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), pid: 1 });
+    setImmediate(() => { child.stdout.end(); child.stderr.end(); child.emit('close', 0, null); });
+    return child;
+  } };
+  const runtime = main(t, { platform: 'linux', childProcess });
+  const env = { LD_PRELOAD: 'ubuntu12_32/gameoverlayrenderer.so:ubuntu12_64/gameoverlayrenderer.so', PATH: 'tools' };
+  await runtime.launch('colosseum', [], { env }, 'Play Pokémon Colosseum', true);
+  await runtime.launch('/bin/sh', [], { env }, 'Build Pokémon Colosseum');
+  await runtime.capture('git', ['rev-parse', 'HEAD'], '.', env);
+  assert.equal(spawned[0].LD_PRELOAD, env.LD_PRELOAD);
+  for (const task of spawned.slice(1)) {
+    assert.equal('LD_PRELOAD' in task, false);
+    assert.equal(task.PATH, 'tools');
+  }
+});
+
 test('Back up automatically off skips the launcher\'s own backups, with a log line, but not Back up saves', t => {
   const runtime = main(t);
   // Backups go to ~/Colosseum Launcher Backups: os.homedir() is HOME, or USERPROFILE on Windows.

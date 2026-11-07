@@ -168,4 +168,12 @@ function failureMessage(label, result, recent, { game = false, platform = proces
   return `${exitDescription(label, result.code, result.signal, platform)}${reason ? `: ${reason}` : ''}. See the activity log.`;
 }
 
-module.exports = { observeProcess, exitDescription, failureMessage, codePageDecoder };
+// What the launcher's tasks run with; the game gets LD_PRELOAD as it is. Started from Steam, it holds Steam's overlay,
+// which is for the game: in a build every program would load it, and its 32-bit copy makes each one print an error.
+// Those lines would fill the log and read as the reason a build failed.
+function taskEnvironment(env) {
+  const { LD_PRELOAD, ...rest } = env;
+  return rest;
+}
+
+module.exports = { observeProcess, exitDescription, failureMessage, codePageDecoder, taskEnvironment };
