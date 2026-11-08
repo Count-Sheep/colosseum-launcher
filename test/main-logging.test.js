@@ -222,3 +222,13 @@ test('a task that runs out of disk space says the drive is full, in the alert an
   // Anything else is shown as it was.
   await assert.rejects(runtime.exclusive('Download port source', () => { throw new Error('fatal: early EOF'); }), /^Error: fatal: early EOF$/);
 });
+
+test('the game\'s Discord presence lines stay out of the activity log, and other programs\' lines don\'t', async t => {
+  const runtime = main(t);
+  const presenceLine = '[presence] {"mode":"field","story":1,"floor":1,"area":1,"place":"OUTSKIRT STAND","opponent":"","lead":"","level":0}';
+  const print = text => ['-e', `process.stdout.write(${JSON.stringify(text)})`];
+  await runtime.launch(process.execPath, print(`${presenceLine}\nfloor loaded\n${presenceLine}`), {}, 'Play Pokémon Colosseum', true);
+  await runtime.launch(process.execPath, print(`${presenceLine}\n`), {}, 'Build game');
+  const stdout = runtime.activityLog.snapshot().filter(entry => entry.stream === 'stdout').map(entry => entry.text);
+  assert.deepEqual(stdout, ['floor loaded', presenceLine]);
+});

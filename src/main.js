@@ -28,6 +28,8 @@ const steam = require('./steam');
 const crashReports = require('./crash-reports');
 const telemetry = require('./telemetry');
 const online = require('./online');
+const discord = require('./discord');
+const presence = require('./presence');
 const parties = require('./parties');
 const pokedexData = require('./pokedex').create();
 const randomizer = require('./randomizer');
@@ -510,7 +512,15 @@ async function launch(command, args, options = {}, label = 'Task', isGame = fals
       percent: null, startedAt: Date.now() };
     broadcast('activity', activityState());
     const recent = [], readActivity = createActivityReader();
+    // The game's [presence] lines go to Discord, not the activity log; a
+    // partial line that could become one waits for the rest.
+    function output(text, stream, entry) {
+      if (isGame && stream === 'stdout' && !entry && text
+        && (presence.isPresenceLine(text) || presence.PREFIX.startsWith(text))) return entry;
+      return logOutput(text, stream, entry);
+    }
     function line(value, stream, entry) {
+      if (isGame && stream === 'stdout' && presence.isPresenceLine(value)) return onPresence?.(value);
       completeOutput(value, stream, entry);
       if (!value) return;
       if (recent.push(value) > 80) recent.shift();
@@ -520,7 +530,7 @@ async function launch(command, args, options = {}, label = 'Task', isGame = fals
         broadcast('activity', activityState());
       }
     }
-    const { error, code, signal } = await observeProcess(child, { output: logOutput, line });
+    const { error, code, signal } = await observeProcess(child, { output, line });
     active = null;
     broadcast('activity', activityState());
     if (error) throw error;
@@ -930,11 +940,13 @@ async function play(installation = null, battle = null) {
     // The renderer's caches, in the launcher's own folder: its default place is shared with the Sunshine port's.
     COLO_RANDOMIZER_LOG: spoilerFile(),
     SMS_GX_SHADER_CACHE: path.join(cacheFolder, 'gx-programs.bin'), SMS_TEXTURE_PACK_CACHE: path.join(cacheFolder, 'texture-mips'),
-    ...(battle ? { COLO_ONLINE: String(battle.port), COLO_SKIP_MOVIES: '1', COLO_NOCARD: '1' } : {}) };
+    ...(battle ? { COLO_ONLINE: String(battle.port), COLO_SKIP_MOVIES: '1', COLO_NOCARD: '1' } : {}),
+    ...(config.settings.discordPresence ? { COLO_PRESENCE: '1' } : {}) };
   const recordedTools = game.toolRoot(root);
   const env = recordedTools ? buildTools.environmentAtRoot(recordedTools, playEnv) : toolEnv(playEnv);
   const cmd = port.gameRunCommand(root, rom, process.platform, env);
   const startedAt = Date.now();
+  startPresence(startedAt, Boolean(battle));
   try {
     return await launch(cmd.command, cmd.args, { cwd: cmd.cwd, env: cmd.env }, PLAY_LABEL, true);
   } catch (error) {
@@ -946,11 +958,40 @@ async function play(installation = null, battle = null) {
     log('Stopped the game.');
     return { ok: true };
   } finally {
+    stopPresence();
     if (!battle) {
       try { makeSaveBackup('after-play'); }
       catch (error) { log(`Save backup failed: ${error.message}`); }
     }
   }
+}
+
+// --- Discord activity (src/discord.js, src/presence.js): only while the game runs, and only with the setting on.
+let discordPresence = null;
+let presenceSession = null;   // { startedAt, game: the game's latest [presence], online }
+let onPresence = null;        // the running game's handler for its [presence] lines
+
+function showPresence() {
+  if (!presenceSession || !discordPresence) return;
+  const { startedAt, game: latest, online: isOnline } = presenceSession;
+  discordPresence.set(presence.activity(latest, { startedAt, online: isOnline ? { opponent: battle?.opponent || null } : null }));
+}
+
+function startPresence(startedAt, isOnline) {
+  if (!config.settings.discordPresence) return;
+  discordPresence ||= discord.createPresence({ log });
+  presenceSession = { startedAt, game: null, online: isOnline };
+  onPresence = line => {
+    const latest = presence.parseLine(line);
+    if (latest && presenceSession) { presenceSession.game = latest; showPresence(); }
+  };
+  showPresence();
+}
+
+function stopPresence() {
+  onPresence = null;
+  presenceSession = null;
+  discordPresence?.stop();
 }
 
 async function launchGame(update = config.settings.autoUpdate) {
@@ -1128,6 +1169,7 @@ function watchSession(session) {
     battle.status = 'battling';
     battle.opponent = message.players[1 - message.side].name;
     broadcastOnline();
+    showPresence();
   });
   session.on('peer', peer => { if (battle) { battle.peerLost = peer === 'lost'; broadcastOnline(); } });
   session.on('end', result => {

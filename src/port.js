@@ -150,6 +150,8 @@ function normalizeSettings(input = {}, platform = process.platform, arch = gameA
     autoBackups: input.autoBackups !== false,
     // Anonymous usage heartbeats (src/telemetry.js). The online count shows either way.
     shareUsage: input.shareUsage !== false,
+    // While the game runs, Discord shows where the player is (src/presence.js).
+    discordPresence: input.discordPresence !== false,
     darkMode: Boolean(input.darkMode),
     // Keys and controller buttons the player changed in Settings → Controls; the rest stay the game's defaults.
     keyBindings: bindings.normalize(input.keyBindings),
