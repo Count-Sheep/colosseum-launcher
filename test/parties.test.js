@@ -38,6 +38,14 @@ test('only a full party can be battled with, and a full party is always chosen',
   assert.equal(parties.selectedParty(none), null);
 });
 
+test('the Story party stays chosen, whatever the save holds, and isn\'t one of the built parties', () => {
+  const full = { id: 'full', name: 'A', members: [1, 2, 3, 4, 5, 6] };
+  const story = parties.normalize({ parties: [full], selected: parties.STORY });
+  assert.equal(story.selected, parties.STORY);
+  assert.equal(parties.selectedParty(story), null);
+  assert.equal(parties.normalize({ parties: [], selected: parties.STORY }).selected, parties.STORY);
+});
+
 test('rules come from what rooms offer', () => {
   assert.equal(parties.normalize({ level: 100, size: 3 }).level, 100);
   assert.equal(parties.normalize({ level: 100, size: 3 }).size, 3);

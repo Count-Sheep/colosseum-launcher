@@ -25,8 +25,19 @@ test('a build id fits what the room keeps, and tells builds apart', () => {
 test('the game is told what to set up, and who is in the battle', () => {
   assert.equal(online.configLine({ side: 1, rules: { level: 100, size: 3, stage: 2 } }), 'config 1 100 3 2');
   assert.equal(online.configLine({ side: 0, rules: { level: 50, size: 6 }, code: 'KQ7M2D' }), 'config 0 50 6 0 KQ7-M2D');
-  assert.equal(online.startLine({ seed: 7, players: [{ name: 'Ash K', party: [1, 2, 3, 4, 5, 6] }, { name: 'Misty', party: [7, 8, 9, 10, 11, 12] }] }),
-    'start 7 Ash_K Misty 1 2 3 4 5 6 7 8 9 10 11 12');
+  assert.deepEqual(online.startLines({ seed: 7, players: [{ name: 'Ash K', party: [1, 2, 3, 4, 5, 6] }, { name: 'Misty', party: [7, 8, 9, 10, 11, 12] }] }),
+    ['start 7 Ash_K Misty 1 2 3 4 5 6 7 8 9 10 11 12']);
+});
+
+test('a Story party\'s Pokemon reach the game before the start, and a short party is filled with 0', () => {
+  const umbreon = [197, 925108171, 2923127179, 4, 0, 0, 220, 44, 0, 290, 0, 269, 0, 289, 0, 23, 17, 30, 19, 2, 17, 0, 0, 0, 0, 0, 0, '0055004d004200520045004f004e'];
+  const espeon = [196, 3998980838, 2923127179, 4, 0, 0, 220, 93, 0, 216, 0, 115, 0, 270, 0, 20, 17, 26, 27, 23, 23, 0, 0, 0, 0, 0, 0, '-'];
+  const lines = online.startLines({ seed: 9, players: [{ name: 'Ash', party: [1, 2, 3, 4, 5, 6] },
+    { name: 'Wes', party: [197, 196, 250], members: [umbreon, espeon, [250, ...umbreon.slice(1)]] }] });
+  assert.equal(lines.length, 4);
+  assert.equal(lines[0], 'member 1 0 197 925108171 2923127179 4 0 0 220 44 0 290 0 269 0 289 0 23 17 30 19 2 17 0 0 0 0 0 0 0055004d004200520045004f004e');
+  assert.match(lines[1], /^member 1 1 196 .* -$/);
+  assert.equal(lines[3], 'start 9 Ash Wes 1 2 3 4 5 6 197 196 250 0 0 0');
 });
 
 // A room's WebSocket, as a session uses it.

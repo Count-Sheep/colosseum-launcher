@@ -1,6 +1,7 @@
 {
   "beta": {
     "launcher": [
+      "Story party: battle online with the Pokémon you travel with. The Online tab shows the party in your save, set apart at the top, and brings each one along with its moves, nature, stats, ability, held item and nickname, at the room's level. A party of 3 to 5 can take rooms of 3 each, and Shadow Pokémon stay home until they're purified. Online battles now need the newest launcher on both sides.",
       "Show on Discord: while you play, your Discord profile shows where you are in Orre with a picture of the place, who you're battling and your lead Pokémon, and online battles show your opponent. The Discord app needs to be open. Turn it off under Settings → Launcher.",
       "Fixed game updates started from Steam filling the activity log with Steam overlay errors, which could also hide why a build failed.",
       "Fixed a crash report on Linux and the Steam Deck when you closed the game with Stop in Steam.",
@@ -30,7 +31,8 @@
       "Fixed Pokémon blinking twice as often at 60 fps, which also used up the game's random numbers faster than on a GameCube.",
       "Save anywhere: the menu you open with Start has a new SAVE option above EXIT. It saves where you stand, and Continue puts you back on that spot.",
       "In widescreen, the menu you open with Start now sits at the right edge of the screen, as it does in 4:3.",
-      "The game tells the launcher where you are, who you're battling and your lead Pokémon, for Show on Discord."
+      "The game tells the launcher where you are, who you're battling and your lead Pokémon, for Show on Discord.",
+      "Online battles can use your Story party: each Pokémon keeps its moves, nature, stats, ability, held item, nickname and Poké Ball, at the battle's level."
     ]
   },
   "releases": [

@@ -17,8 +17,10 @@
 const net = require('node:net');
 const { EventEmitter } = require('node:events');
 const telemetry = require('./telemetry');
+const storyParty = require('./story-party');
 
-const PROTOCOL = 1;
+// 2: a party can be a Story party, its Pokémon sent whole as `members`, and shorter than six.
+const PROTOCOL = 2;
 const STAGES = 6;              // the game's stadiums a room can use
 const PING_EVERY = 30000;      // ms between WebSocket keepalives
 const STATUS_EVERY = 30000;    // ms between a host's refreshes of its row on the room list
@@ -73,8 +75,13 @@ function configLine({ side, rules, code }) {
   return `config ${side} ${rules.level} ${rules.size} ${rules.stage || 0}${code ? ` ${formatRoomCode(code)}` : ''}`;
 }
 
-function startLine({ seed, players }) {
-  return `start ${seed} ${lineName(players[0].name)} ${lineName(players[1].name)} ${[...players[0].party, ...players[1].party].join(' ')}`;
+// The battle's lines for the game: each Story party member, then the start, with a short party filled with 0.
+function startLines({ seed, players }) {
+  const party = player => Array.from({ length: storyParty.PARTY_SIZE }, (_, i) => player.party[i] || 0);
+  // a member that isn't a party member's shape stays out, and the game makes that Pokemon from its species, as the other game does
+  const members = players.flatMap((player, side) => (Array.isArray(player.members) ? player.members : []).slice(0, storyParty.PARTY_SIZE)
+    .flatMap((member, slot) => storyParty.validWireMember(member, player.party[slot]) ? [storyParty.memberLine(side, slot, member)] : []));
+  return [...members, `start ${seed} ${lineName(players[0].name)} ${lineName(players[1].name)} ${[...party(players[0]), ...party(players[1])].join(' ')}`];
 }
 
 // The local port the game connects to. Lines sent before it does wait for it.
@@ -125,6 +132,7 @@ function openSocket(url, WebSocketImpl = globalThis.WebSocket) {
 
 const REFUSED = {
   version: 'That room is on another version of the game. Both players need the same version.',
+  launcher: 'That room\'s player has another version of the launcher. Both players need the newest one.',
   full: 'That battle has already started.',
   party: 'The room server didn\'t accept your party.'
 };
@@ -152,21 +160,21 @@ class Session extends EventEmitter {
   }
 
   // A host's room: resolves with the code once the server has made it.
-  async host({ name, build, version, launcher, party, rules, listed }) {
+  async host({ name, build, version, launcher, party, members, rules, listed }) {
     this.role = 'host';
     this.rules = { ...rules, stage: Number.isInteger(rules.stage) ? rules.stage : Math.floor(Math.random() * STAGES) };
     await this.connect(`${socketUrl(this.url)}/v1/rooms/new`);
     this.ws.send(JSON.stringify({ type: 'hello', name, build, version, launcher, protocol: PROTOCOL,
-      rules: this.rules, party, public: listed !== false }));
+      rules: this.rules, party, ...(members ? { members } : {}), public: listed !== false }));
     return this.answer('room', () => this.code);
   }
 
   // Into a host's room: resolves with the room's start message, or rejects when refused.
-  async join({ code, name, build, version, launcher, party }) {
+  async join({ code, name, build, version, launcher, party, members }) {
     this.role = 'joiner';
     this.code = code;
     await this.connect(`${socketUrl(this.url)}/v1/rooms/${code}/join`);
-    this.ws.send(JSON.stringify({ type: 'hello', name, build, version, launcher, protocol: PROTOCOL, party }));
+    this.ws.send(JSON.stringify({ type: 'hello', name, build, version, launcher, protocol: PROTOCOL, party, ...(members ? { members } : {}) }));
     return this.answer('start', message => message);
   }
 
@@ -221,7 +229,7 @@ class Session extends EventEmitter {
   // What the game needs as it starts, and the battle if there is one yet.
   setUpGame() {
     this.bridge.send(this.start ? configLine(this.start) : configLine({ side: 0, rules: this.rules, code: this.code }));
-    if (this.start) this.bridge.send(startLine(this.start));
+    if (this.start) for (const line of startLines(this.start)) this.bridge.send(line);
   }
 
   // A host's game waited in the stadium, and has gone so that it can start again for the battle.
@@ -261,7 +269,7 @@ class Session extends EventEmitter {
       this.side = msg.side;
       this.key = msg.key;
       this.emit('start', msg);
-      this.bridge?.send(startLine(msg));
+      if (this.bridge) for (const line of startLines(msg)) this.bridge.send(line);
     } else if (msg.type === 'refused') this.emit('refused', msg.reason);
     else if (msg.type === 'game') this.onGame(msg);
     else if (msg.type === 'peer-lost') { this.bridge?.send('lost'); this.emit('peer', 'lost'); }
@@ -334,4 +342,4 @@ class Session extends EventEmitter {
   }
 }
 
-module.exports = { PROTOCOL, STAGES, parseRoomCode, formatRoomCode, buildId, serverUrl, listRooms, lookup, configLine, startLine, createBridge, Session };
+module.exports = { PROTOCOL, STAGES, parseRoomCode, formatRoomCode, buildId, serverUrl, listRooms, lookup, configLine, startLines, createBridge, Session };

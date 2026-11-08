@@ -703,6 +703,21 @@ pre { height: 120px; margin: 0; padding: 12px; overflow: auto; border-radius: 8p
 .party-card-team img, .party-card-team span { width: 36px; height: 36px; }
 .party-card-team span { display: grid; place-items: center; border-radius: 50%; background: #0000000a; color: #a18f9c; font-size: 10px; }
 .party-card small { color: #b05a33; font-size: 11px; font-weight: 600; }
+/* the Story party: the save's own team, set apart from the parties built in the launcher */
+.story-card { border-color: #d9a441; background: linear-gradient(135deg, #fff8e6, var(--dex-panel) 60%); }
+.story-card:not([aria-disabled=true]):hover, .story-card[aria-checked=true] { border-color: #c4891f; }
+.story-card[aria-checked=true] { box-shadow: inset 3px 0 0 #c4891f; }
+.story-card[aria-disabled=true] { opacity: .8; }
+.story-badge { padding: 2px 8px; border-radius: 999px; background: #c4891f; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+.story-team { gap: 4px; min-height: 48px; }
+.story-team .story-member { position: relative; display: grid; place-items: center; width: 40px; height: 48px; border-radius: 8px; background: #c4891f14; }
+.story-team .story-member img { width: 36px; height: 36px; }
+.story-team .story-member small { position: absolute; bottom: 0; color: #8a5d12; font-size: 9px; font-weight: 700; }
+.story-team .story-member.shiny { box-shadow: inset 0 0 0 1px #e8b93a; }
+.story-team .story-member.shiny::after { content: '✦'; position: absolute; top: 1px; right: 3px; color: #d99a12; font-size: 9px; }
+.party-card small.story-note { grid-column: 1 / -1; color: #8a6a3a; font-weight: 500; }
+.dark .story-card { border-color: #9a6c1c; background: linear-gradient(135deg, #4a3014, var(--dex-panel) 60%); }
+.dark .story-team .story-member small, .dark .party-card small.story-note { color: #f1c879; }
 .online-create { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; padding: 12px; border: 1px solid var(--dex-line); border-radius: 12px; background: var(--dex-panel); }
 .online-check { grid-column: 1; display: flex; align-items: center; gap: 7px; font-size: 12px; }
 .online-create #online-create { grid-column: 2; }
