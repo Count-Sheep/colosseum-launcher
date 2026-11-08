@@ -1,6 +1,7 @@
 {
   "beta": {
     "launcher": [
+      "Show on Discord: while you play, your Discord profile shows where you are in Orre with a picture of the place, who you're battling and your lead Pokémon, and online battles show your opponent. The Discord app needs to be open. Turn it off under Settings → Launcher.",
       "Fixed game updates started from Steam filling the activity log with Steam overlay errors, which could also hide why a build failed.",
       "Fixed a crash report on Linux and the Steam Deck when you closed the game with Stop in Steam.",
       "Fixed Create room staying greyed out online: a full party is now always chosen for you, a party short of six can't be chosen, and the button wakes up once the game has finished installing or updating.",
@@ -26,7 +27,8 @@
       "Fixed the arrow for picking a target sitting away from the status panels in widescreen.",
       "Fixed Pokémon blinking twice as often at 60 fps, which also used up the game's random numbers faster than on a GameCube.",
       "Save anywhere: the menu you open with Start has a new SAVE option above EXIT. It saves where you stand, and Continue puts you back on that spot.",
-      "In widescreen, the menu you open with Start now sits at the right edge of the screen, as it does in 4:3."
+      "In widescreen, the menu you open with Start now sits at the right edge of the screen, as it does in 4:3.",
+      "The game tells the launcher where you are, who you're battling and your lead Pokémon, for Show on Discord."
     ]
   },
   "releases": [
