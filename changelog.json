@@ -24,7 +24,9 @@
       "Fixed the game not opening its window on Linux with newer graphics drivers, and that error calling the game Super Mario Sunshine.",
       "Fixed people and objects disappearing near the sides of the screen in widescreen.",
       "Fixed the arrow for picking a target sitting away from the status panels in widescreen.",
-      "Fixed Pokémon blinking twice as often at 60 fps, which also used up the game's random numbers faster than on a GameCube."
+      "Fixed Pokémon blinking twice as often at 60 fps, which also used up the game's random numbers faster than on a GameCube.",
+      "Save anywhere: the menu you open with Start has a new SAVE option above EXIT. It saves where you stand, and Continue puts you back on that spot.",
+      "In widescreen, the menu you open with Start now sits at the right edge of the screen, as it does in 4:3."
     ]
   },
   "releases": [
