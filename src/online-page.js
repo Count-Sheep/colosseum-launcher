@@ -2,7 +2,7 @@
 // game itself are the main process's (src/online.js); this page shows them and asks.
 (() => {
   const $ = id => document.getElementById(id);
-  const PARTY_SIZE = 6, NO_ROOMS = 'No rooms are open. Create one and wait for a challenger.';
+  const PARTY_SIZE = 6, STORY = 'story', NO_ROOMS = 'No rooms are open. Create one and wait for a challenger.';
   const REFRESH_REST = 3000; // ms before Refresh works again: the server's list is this old at best
   const message = error => String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
   const number = national => `#${String(national).padStart(3, '0')}`;
@@ -42,9 +42,52 @@
   }
 
   // --- Parties
+  // How many each the chosen party can take: a Story party can be short of six.
+  function partyCount() {
+    return setup.selected === STORY ? state.story.members.length : PARTY_SIZE;
+  }
+
+  // The save's own party, first and set apart: chosen like the others, never edited here.
+  function storyCard() {
+    const story = state.story;
+    const count = story.members.length;
+    const card = Object.assign(document.createElement('div'), { className: 'party-card story-card' });
+    card.setAttribute('role', 'radio');
+    card.setAttribute('aria-checked', String(setup.selected === STORY));
+    const usable = story.supported && !story.error && count >= 3;
+    card.setAttribute('aria-disabled', String(!usable));
+    card.tabIndex = usable ? 0 : -1;
+    const name = Object.assign(document.createElement('strong'), { textContent: 'Story party' });
+    const badge = Object.assign(document.createElement('span'), { className: 'story-badge', textContent: 'From your save' });
+    const team = Object.assign(document.createElement('div'), { className: 'party-card-team story-team' });
+    team.append(...story.members.map(member => {
+      const slot = Object.assign(document.createElement('span'), { className: `story-member${member.shiny ? ' shiny' : ''}` });
+      const species = byId.get(member.species)?.name;
+      slot.title = `${member.nickname || species || 'Pokémon'}${species && member.nickname !== species.toUpperCase() ? ` (${species})` : ''}, Lv ${member.level} in your save${member.shiny ? ', shiny' : ''}`;
+      slot.append(sprite(member.species, 36), Object.assign(document.createElement('small'), { textContent: `Lv${member.level}` }));
+      return slot;
+    }));
+    for (let i = count; i < PARTY_SIZE; i++) team.append(Object.assign(document.createElement('span'), { textContent: '–' }));
+    card.append(name, badge, team);
+    const note = !story.supported ? 'Update the game from the Play page to battle with your Story party.'
+      : story.error ? `Your save can't be read: ${story.error}`
+      : !count && !story.leftOut ? 'Play and save the game, and the party you travel with shows here.'
+      : count < 3 ? `${count} Pokémon can battle: you need at least 3.`
+      : `${story.trainer ? `${story.trainer}'s team, ` : ''}with their moves, natures and held items, at the room's level.`;
+    const detail = Object.assign(document.createElement('small'), { className: usable ? 'story-note' : '', textContent: note });
+    card.append(detail);
+    if (story.leftOut)
+      card.append(Object.assign(document.createElement('small'), { className: 'story-note', textContent: `${story.leftOut === 1 ? 'A Shadow Pokémon stays' : `${story.leftOut} Shadow Pokémon stay`} home until purified.` }));
+    if (!usable) return card;
+    const choose = () => { setup.selected = STORY; save(); };
+    card.addEventListener('click', choose);
+    card.addEventListener('keydown', event => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); choose(); } });
+    return card;
+  }
+
   function renderParties() {
     $('party-empty').hidden = setup.parties.length > 0;
-    $('party-list').replaceChildren(...setup.parties.map(party => {
+    $('party-list').replaceChildren(storyCard(), ...setup.parties.map(party => {
       const missing = PARTY_SIZE - party.members.length;
       const card = document.createElement('div');
       card.className = 'party-card';
@@ -151,13 +194,13 @@
     $('online-rooms-empty').hidden = rooms.length > 0;
     $('online-rooms').replaceChildren(...rooms.map(room => {
       // Both games play the same battle, so a room takes the same build of the game only.
-      const sameGame = room.build === state.build, waiting = room.status === 'waiting';
-      const detail = !waiting ? ' · in battle' : sameGame ? '' : ` · needs game ${room.version}`;
+      const sameGame = room.build === state.build, waiting = room.status === 'waiting', fits = room.rules.size <= partyCount();
+      const detail = !waiting ? ' · in battle' : !sameGame ? ` · needs game ${room.version}` : fits ? '' : ' · your party is too short';
       const row = Object.assign(document.createElement('div'), { className: 'online-room' });
       row.append(Object.assign(document.createElement('span'), { textContent: room.name }));
       row.append(Object.assign(document.createElement('small'), { textContent: `${rulesText(room.rules)}${detail}` }));
       const join = Object.assign(document.createElement('button'), { className: 'solid', type: 'button', textContent: 'Join' });
-      join.disabled = busy || !waiting || !sameGame;
+      join.disabled = busy || !waiting || !sameGame || !fits;
       join.addEventListener('click', () => joinRoom(room.code));
       row.append(join);
       return row;
@@ -211,6 +254,11 @@
       : battle.status === 'waiting' ? `Waiting for a challenger. ${rulesText(battle.rules)}.` : rulesText(battle.rules);
   }
 
+  function showSizeNote() {
+    $('online-blocked').textContent = `Your Story party has ${partyCount()} Pokémon that can battle: choose 3 each to create a room.`;
+    $('online-blocked').hidden = false;
+  }
+
   function render() {
     if (!state) return;
     setup = state.setup;
@@ -224,7 +272,11 @@
     $('online-blocked').textContent = state.ready || '';
     $('online-blocked').hidden = !state.ready;
     const busy = Boolean(state.ready) || Boolean(state.battle);
-    $('online-create').disabled = busy;
+    // A Story party short of six takes rooms of fewer each
+    const short = setup.size > partyCount();
+    $('online-size').querySelector('option[value="6"]').disabled = partyCount() < 6;
+    if (short && !busy) showSizeNote();
+    $('online-create').disabled = busy || short;
     $('online-code-join').disabled = busy;
   }
 
@@ -268,6 +320,8 @@
   window.coloOnline = {
     show() {
       if (!species) loadingSpecies ||= loadSpecies();
+      // the save may have changed since: the Story party is read again
+      window.colo.state().then(data => { state = data.online; render(); if (rooms) renderRooms(); }).catch(() => {});
       poll.start();
     },
     hide() { poll.stop(); }

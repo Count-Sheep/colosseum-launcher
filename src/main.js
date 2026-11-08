@@ -31,6 +31,7 @@ const online = require('./online');
 const discord = require('./discord');
 const presence = require('./presence');
 const parties = require('./parties');
+const storyParty = require('./story-party');
 const pokedexData = require('./pokedex').create();
 const randomizer = require('./randomizer');
 const { retrying, httpError } = require('./retry');
@@ -1100,28 +1101,80 @@ let battleResult = null;
 
 function onlineState() {
   return { setup: config.online, ready: onlineReadiness(), build: binaryReady() ? gameBuild().build : null, result: battleResult,
+    story: storyState(),
     battle: battle && { status: battle.status, code: online.formatRoomCode(battle.code), role: battle.role, rules: battle.rules,
       opponent: battle.opponent, peerLost: Boolean(battle.peerLost) } };
 }
 
 function broadcastOnline() { broadcast('online', onlineState()); }
 
-// The game's executable has to know about online battles: builds from before them don't.
+// The game's executable has to know about online battles, and about Story parties: builds from before them don't.
 let onlineBinary = null;
-function gameHasOnline(root) {
+function onlineFeatures(root) {
   try {
     const file = port.binaryPath(root);
     const { mtimeMs } = fs.statSync(file);
-    if (onlineBinary?.file !== file || onlineBinary.mtimeMs !== mtimeMs)
-      onlineBinary = { file, mtimeMs, online: fs.readFileSync(file).includes('COLO_ONLINE') };
-    return onlineBinary.online;
-  } catch (_) { return false; }
+    if (onlineBinary?.file !== file || onlineBinary.mtimeMs !== mtimeMs) {
+      const bytes = fs.readFileSync(file);
+      onlineBinary = { file, mtimeMs, online: bytes.includes('COLO_ONLINE'), story: bytes.includes('online: story member') };
+    }
+    return onlineBinary;
+  } catch (_) { return { online: false, story: false }; }
+}
+const gameHasOnline = root => onlineFeatures(root).online;
+
+// The Story party, read again whenever the save changes. null without a save; error when it can't be read.
+let storyCache = null;
+function readStory() {
+  const file = path.join(currentSaveDirectory(), 'pokemon_colosseum.dat');
+  const mtimeMs = fs.statSync(file, { throwIfNoEntry: false })?.mtimeMs ?? null;
+  if (storyCache?.file !== file || storyCache.mtimeMs !== mtimeMs) {
+    let party = null, error = null;
+    try { party = storyParty.readStoryParty(currentSaveDirectory()); }
+    catch (failure) { error = failure.message; }
+    storyCache = { file, mtimeMs, party, error };
+  }
+  return storyCache;
+}
+
+// What the Online page shows of it.
+function storyState() {
+  const { party, error } = readStory();
+  return { error, supported: binaryReady() && onlineFeatures(config.repo).story,
+    trainer: party?.trainer || null, leftOut: party?.leftOut || 0,
+    members: (party?.members || []).map(member => ({ species: member.species, nickname: member.nickname, level: member.level, shiny: member.shiny })) };
+}
+
+// Why the Story party can't battle in a room of `size` each, or null.
+function storyBlocked(size) {
+  const { party, error } = readStory();
+  if (!binaryReady() || !onlineFeatures(config.repo).story) return 'This version of the game can\'t battle with your Story party yet. Update it from the Play page.';
+  if (error) return `Your save can't be read: ${error}`;
+  if (!party) return 'Your Story party is the one in your save. Play and save the game first.';
+  const count = party.members.length;
+  const shadow = party.leftOut ? ` Shadow Pokémon stay home until they're purified.` : '';
+  if (count < size) return count < Math.min(...parties.SIZES)
+    ? `Your Story party needs at least ${Math.min(...parties.SIZES)} Pokémon that can battle.${shadow}`
+    : `Your Story party has ${count} Pokémon that can battle, so it can only take ${parties.SIZES.filter(each => each <= count).join(' or ')} each.${shadow}`;
+  return null;
+}
+
+// The party to battle with in a room of `size` each: species, and for the Story party its Pokémon whole.
+function battleParty(size) {
+  if (config.online.selected === parties.STORY) {
+    const blocked = storyBlocked(size);
+    if (blocked) throw new Error(blocked);
+    const members = readStory().party.members.slice(0, parties.PARTY_SIZE);
+    return { party: members.map(member => member.species), members: members.map(storyParty.wireMember) };
+  }
+  return { party: parties.selectedParty(config.online).members };
 }
 
 // Why a room can't be made or joined now, or null.
 function onlineReadiness() {
   if (!port.isPort(config.repo) || !binaryReady()) return 'Set up the game on the Play page first.';
   if (!gameHasOnline(config.repo)) return 'This version of the game has no online battles yet. Update it from the Play page.';
+  if (config.online.selected === parties.STORY) return storyBlocked(Math.min(...parties.SIZES));
   if (!parties.selectedParty(config.online)) return 'Build a party of six to battle with.';
   return null;
 }
@@ -1183,14 +1236,14 @@ function watchSession(session) {
 async function createRoom() {
   requireOnlineReady();
   const setup = config.online;
-  const party = parties.selectedParty(setup).members;
+  const chosen = battleParty(setup.size);
   const session = new online.Session();
   battleResult = null;
   battle = { session, status: 'connecting', role: 'host', rules: { level: setup.level, size: setup.size }, code: null, opponent: null };
   broadcastOnline();
   watchSession(session);
   try {
-    battle.code = await session.host({ name: setup.trainer, ...gameBuild(), party,
+    battle.code = await session.host({ name: setup.trainer, ...gameBuild(), ...chosen,
       rules: { level: setup.level, size: setup.size }, listed: setup.listed });
   } catch (error) {
     session.close();
@@ -1214,10 +1267,11 @@ async function joinRoom(input) {
   battleResult = null;
   const info = await online.lookup(code);
   if (info.status !== 'waiting') throw new Error('That battle has already started.');
+  const chosen = battleParty(info.rules?.size || parties.PARTY_SIZE);
   battle = { session, status: 'connecting', role: 'joiner', rules: info.rules, code, opponent: info.name };
   broadcastOnline();
   watchSession(session);
-  try { await session.join({ code, name: setup.trainer, ...gameBuild(), party: parties.selectedParty(setup).members }); }
+  try { await session.join({ code, name: setup.trainer, ...gameBuild(), ...chosen }); }
   catch (error) {
     session.close();
     battle = null;

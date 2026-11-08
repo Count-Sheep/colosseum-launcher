@@ -3,7 +3,8 @@
 // The player's online setup: their trainer name, the parties they built from
 // the Pokédex, which one they battle with, and the room options they last used.
 // Saved in the launcher's config. Parties are lists of the game's species
-// numbers, as the Pokédex (src/pokedex.js) reads them from the disc.
+// numbers, as the Pokédex (src/pokedex.js) reads them from the disc. The
+// Story party (src/story-party.js) is the save's own, chosen as STORY.
 
 const PARTY_SIZE = 6;
 const MAX_PARTIES = 32;
@@ -11,6 +12,7 @@ const NAME_LENGTH = 24;
 const TRAINER_LENGTH = 10;
 const LEVELS = [50, 100];
 const SIZES = [3, 6];
+const STORY = 'story';
 // The game numbers its species up to 411, with a gap between the second generation and the third.
 const validSpecies = id => Number.isInteger(id) && ((id >= 1 && id <= 251) || (id >= 277 && id <= 411));
 
@@ -40,17 +42,18 @@ function normalize(input) {
   // Always a party ready to battle with: having one is enough to open a room.
   const ready = party => party.members.length === PARTY_SIZE;
   const chosen = parties.find(party => party.id === input?.selected);
-  const selected = (chosen && ready(chosen) ? chosen : parties.find(ready))?.id ?? null;
+  // The Story party stays chosen while the save changes: whether it can battle is the main process's to say.
+  const selected = input?.selected === STORY ? STORY : (chosen && ready(chosen) ? chosen : parties.find(ready))?.id ?? null;
   return { trainer: trainerName(input?.trainer), parties, selected,
     level: LEVELS.includes(input?.level) ? input.level : LEVELS[0],
     size: SIZES.includes(input?.size) ? input.size : SIZES[1],
     listed: input?.listed !== false };
 }
 
-// The chosen party, when it is ready to battle with.
+// The chosen party of the player's own, when it is ready to battle with (not the Story party).
 function selectedParty(online) {
   const party = online.parties.find(item => item.id === online.selected);
   return party?.members.length === PARTY_SIZE ? party : null;
 }
 
-module.exports = { PARTY_SIZE, MAX_PARTIES, NAME_LENGTH, TRAINER_LENGTH, LEVELS, SIZES, validSpecies, trainerName, normalizeParty, normalize, selectedParty };
+module.exports = { PARTY_SIZE, MAX_PARTIES, NAME_LENGTH, TRAINER_LENGTH, LEVELS, SIZES, STORY, validSpecies, trainerName, normalizeParty, normalize, selectedParty };
