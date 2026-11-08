@@ -19,6 +19,7 @@
       "Online battles: two players' games play one battle, with both choosing their moves at the same time, from the launcher's Online tab.",
       "Fixed online battles stopping as out of sync after a move that lasts more than one turn, such as Rollout or Outrage.",
       "Fixed online battles on Windows staying on a black screen once the other player joined, with only the sound playing.",
+      "Fixed Pokémon getting a different nature and gender than a GameCube would give them at the same moment, which also threw off the random rolls after it, such as trainers' teams and damage.",
       "Randomizer: a new save can be a randomized run, and the save keeps its seed.",
       "Macs with Apple Silicon: the game runs natively, and the wipe into a trainer battle plays in full instead of going black.",
       "Rui and most trainers now have their detailed models in the field too, with sharper faces and real fingers.",
